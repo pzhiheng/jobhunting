@@ -4,8 +4,13 @@ Source of truth for where the build is. Updated at every phase checkpoint.
 See `RESUME.md` for how to resume a paused build, and the approved plan at
 `~/.claude/plans/snappy-foraging-stonebraker.md` for full detail.
 
-**Current phase:** Phase 2 — Judgment (implemented; independent verification next)
-**Next action:** spawn fresh-context verifier; then advance to Phase 3 (web app).
+**Current phase:** Phase 2 complete & verified → Phase 3 (Web app) not started
+**Next action:** Phase 3 (Express API + vanilla-JS tracker UI) is cred-free and
+mock-testable via `npm run seed`. Confirm before starting.
+
+**Backlog (non-blocking, from verifiers):** repair-links real path uses a greedy
+JSON regex (safe failure mode); mock relevance is uniform (cosmetic). Address
+when wiring real credentials.
 
 ---
 
@@ -31,7 +36,8 @@ See `RESUME.md` for how to resume a paused build, and the approved plan at
         gracefully without Adzuna keys.
   - ⏳ Credentialed happy-paths (real configure with ANTHROPIC key, real fetch
         with ADZUNA keys) pending user-provided credentials — not a defect.
-- [~] **Phase 2 — Judgment** (implemented; independent verification next)
+- [x] **Phase 2 — Judgment** (committed `d48d8c1`; independently verified
+      → `VERIFY.md`: **PASS WITH NOTES**, all 5 criteria green)
   - [x] `src/judge.ts`: `JudgmentSchema` + `judgeJob()` (real messages.parse
         sonnet-4-6 w/ résumé+criteria; deterministic mock under `JOBHUNTER_MOCK`)
   - [x] `src/resume.ts`: load `resume.md`/`resume.pdf` (null-tolerant)
