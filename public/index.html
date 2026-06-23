@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Job Tracker</title>
+  <style>
+    :root { --fg:#1c1c1e; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; --bg:#f8fafc; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--fg); background:var(--bg); }
+    header { padding:18px 24px; border-bottom:1px solid var(--line); background:#fff; }
+    h1 { margin:0 0 6px; font-size:18px; }
+    #summary { color:var(--muted); font-size:13px; }
+    nav { display:flex; gap:4px; padding:0 24px; background:#fff; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+    nav button { border:0; background:none; padding:12px 14px; cursor:pointer; color:var(--muted); font-size:14px; border-bottom:2px solid transparent; }
+    nav button.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+    main { padding:20px 24px; }
+    table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+    th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { background:#fafafa; font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); }
+    tr:last-child td { border-bottom:0; }
+    a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+    .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; }
+    .suitable { background:#dcfce7; color:#166534; } .unsuitable { background:#fee2e2; color:#991b1b; } .unreviewed { background:#f1f5f9; color:#475569; }
+    .ok { color:#166534; } .broken, .expired { color:#991b1b; } .repaired { color:#9a6700; } .unchecked { color:var(--muted); }
+    .rel { font-weight:600; }
+    select { font:inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; }
+    .muted { color:var(--muted); }
+    .empty { padding:32px; text-align:center; color:var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Job Tracker</h1>
+    <div id="summary">loading…</div>
+  </header>
+  <nav id="tabs"></nav>
+  <main id="content"></main>
+
+  <script>
+    const SECTIONS = [
+      { key: "top_picks", label: "Top picks" },
+      { key: "all", label: "All" },
+      { key: "not_suitable", label: "Not suitable" },
+      { key: "applied", label: "Applied" },
+      { key: "skills", label: "Skills" },
+    ];
+    const STAGES = ["not_applied","applied","confirmed","oa","interview","offer","rejected"];
+    let active = "top_picks";
+
+    async function j(url, opts) { const r = await fetch(url, opts); return r.json(); }
+
+    async function loadSummary() {
+      const s = await j("/api/summary");
+      document.getElementById("summary").textContent =
+        `${s.total} jobs · ${s.top_picks} top picks · ${s.suitable} suitable · ` +
+        `${s.not_suitable} not suitable · ${s.applied} in pipeline · ${s.broken} dead links`;
+    }
+
+    function renderTabs() {
+      const nav = document.getElementById("tabs");
+      nav.innerHTML = "";
+      for (const s of SECTIONS) {
+        const b = document.createElement("button");
+        b.textContent = s.label;
+        b.className = s.key === active ? "active" : "";
+        b.onclick = () => { active = s.key; renderTabs(); render(); };
+        nav.appendChild(b);
+      }
+    }
+
+    function esc(v) { return String(v ?? "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+    async function setStage(id, stage) {
+      await j(`/api/jobs/${encodeURIComponent(id)}/stage`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ stage }),
+      });
+      loadSummary();
+      if (active === "applied" || active === "top_picks") render();
+    }
+
+    async function render() {
+      const el = document.getElementById("content");
+      if (active === "skills") return renderSkills(el);
+
+      const jobs = await j(`/api/jobs?section=${active}`);
+      if (!jobs.length) { el.innerHTML = `<div class="empty">No jobs here yet.</div>`; return; }
+      const rows = jobs.map(job => `
+        <tr>
+          <td>${job.url ? `<a href="${esc(job.url)}" target="_blank" rel="noopener">${esc(job.title)}</a>` : esc(job.title)}
+              <div class="muted">${esc(job.location)}</div></td>
+          <td>${esc(job.company)}</td>
+          <td>${esc(job.category)}</td>
+          <td class="rel">${job.relevance ?? "–"}</td>
+          <td><span class="pill ${esc(job.suitability)}">${esc(job.suitability)}</span></td>
+          <td class="${esc(job.link_status)}">${esc(job.link_status)}</td>
+          <td>${stageSelect(job)}</td>
+        </tr>`).join("");
+      el.innerHTML = `<table><thead><tr>
+        <th>Title</th><th>Company</th><th>Category</th><th>Rel</th>
+        <th>Suitability</th><th>Link</th><th>Stage</th></tr></thead><tbody>${rows}</tbody></table>`;
+      el.querySelectorAll("select[data-id]").forEach(sel =>
+        sel.onchange = () => setStage(sel.dataset.id, sel.value));
+    }
+
+    function stageSelect(job) {
+      const opts = STAGES.map(s => `<option value="${s}" ${s===job.stage?"selected":""}>${s}</option>`).join("");
+      return `<select data-id="${esc(job.id)}">${opts}</select>`;
+    }
+
+    async function renderSkills(el) {
+      const skills = await j("/api/skills");
+      if (!skills.length) { el.innerHTML = `<div class="empty">No skills extracted yet.</div>`; return; }
+      const rows = skills.map(s =>
+        `<tr><td>${esc(s.skill)}</td><td>${esc(s.category)}</td><td class="rel">${s.count}</td></tr>`).join("");
+      el.innerHTML = `<table><thead><tr><th>Skill</th><th>Category</th><th>Jobs</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    renderTabs(); render(); loadSummary();
+  </script>
+</body>
+</html>

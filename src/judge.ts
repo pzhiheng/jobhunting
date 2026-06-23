@@ -109,11 +109,14 @@ function mockJudgment(job: JobForJudgment): Judgment {
   const found = SKILL_VOCAB.filter((s) =>
     `${job.title} ${job.description}`.toLowerCase().includes(s.toLowerCase()),
   );
+  // alternate by title hash → a seed yields a suitable/unsuitable mix
+  const suitable = hash(job.title) % 2 !== 0;
+  const spread = hash(job.title + "|" + job.description);
   return {
-    relevance: (hash(job.title) % 5) + 1,
+    // correlate: suitable → 4-5 (top-pick range), unsuitable → 1-3
+    relevance: suitable ? 4 + (spread % 2) : 1 + (spread % 3),
     relevanceNotes: "mock relevance",
-    // alternate by title hash so a seed yields a mix → exercises unsuitable retention
-    suitability: hash(job.title) % 2 === 0 ? "unsuitable" : "suitable",
+    suitability: suitable ? "suitable" : "unsuitable",
     suitabilityNotes: "mock suitability",
     skills: found.length ? found : ["general-software"],
   };

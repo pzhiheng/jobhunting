@@ -4,9 +4,8 @@ Source of truth for where the build is. Updated at every phase checkpoint.
 See `RESUME.md` for how to resume a paused build, and the approved plan at
 `~/.claude/plans/snappy-foraging-stonebraker.md` for full detail.
 
-**Current phase:** Phase 2 complete & verified → Phase 3 (Web app) not started
-**Next action:** Phase 3 (Express API + vanilla-JS tracker UI) is cred-free and
-mock-testable via `npm run seed`. Confirm before starting.
+**Current phase:** Phase 3 — Web app (implemented; independent verification next)
+**Next action:** spawn fresh-context verifier; then Phase 4 (email + refine).
 
 **Backlog (non-blocking, from verifiers):** repair-links real path uses a greedy
 JSON regex (safe failure mode); mock relevance is uniform (cosmetic). Address
@@ -53,9 +52,17 @@ when wiring real credentials.
         2 links ok / 2 broken→expired (kept), skill_demand view populated.
   - ⏳ Real judgment quality (LLM relevance/suitability/skills, web-search repair)
         pending résumé + ANTHROPIC key — plumbing verified, quality deferred.
-- [ ] **Phase 3 — Web app**
-  - `server.ts` API + `public/index.html`
-  - ✅ list/filter; sections Top picks / All / Not suitable / Applied / Skills; tick applied persists
+- [x] **Phase 3 — Web app** (implemented; independent verification next)
+  - [x] `src/server.ts`: Express JSON API — `GET /api/jobs?section=`
+        (top_picks/all/not_suitable/applied), `GET /api/skills`, `GET /api/summary`,
+        `POST /api/jobs/:id/stage` (validated); serves `public/`
+  - [x] `public/index.html`: vanilla-JS tabs + job table + per-row stage select
+  - [x] `package.json`: `express` dep + `serve` script
+  - [x] improved mock relevance (suitable→4-5) so Top picks is demonstrable
+        (also resolves verifier note A)
+  - Self-smoke ✅: seed→pipeline→serve; summary/top_picks/sections correct;
+        POST stage 'applied' persists (appears in Applied section); invalid
+        stage → 400; index.html served (200).
 - [ ] **Phase 4 — Email + refine**
   - Gmail OAuth poller; `refine.ts`
   - ✅ poller classifies mail → app_events + stage; `npm run refine` updates filter.json

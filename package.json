@@ -11,15 +11,18 @@
     "curate": "tsx src/curate.ts",
     "check-links": "tsx src/check-links.ts",
     "repair-links": "tsx src/repair-links.ts",
+    "serve": "tsx src/server.ts",
     "build": "tsc"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
     "@libsql/client": "^0.15.15",
     "dotenv": "^16.4.7",
+    "express": "^5.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/express": "^5.0.0",
     "@types/node": "^22.10.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
