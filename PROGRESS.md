@@ -4,9 +4,8 @@ Source of truth for where the build is. Updated at every phase checkpoint.
 See `RESUME.md` for how to resume a paused build, and the approved plan at
 `~/.claude/plans/snappy-foraging-stonebraker.md` for full detail.
 
-**Current phase:** Phase 4 complete & verified → Phase 5 (Analyst) in progress
-**Next action:** build `src/analyze.ts` (read-only SQL analyst → analyses) +
-surface in the web app; mock-testable via seed.
+**Current phase:** Phase 5 — Analyst (implemented; independent verification next)
+**Next action:** spawn fresh-context verifier; then Phase 6 (deploy as /schedule routine).
 
 **Backlog (non-blocking, from verifiers):** repair-links greedy JSON regex (safe);
 app_events email_id no UNIQUE + non-atomic check-insert (fine for serial CLI);
@@ -83,9 +82,17 @@ when wiring real credentials.
   - Self-smoke ✅ (mock): poll → 4 events, 4 stage advances (confirmed/oa/
         interview/rejected), re-poll dedups (0 new); refine rewrites filter.json
         from the instruction using live DB signal.
-- [ ] **Phase 5 — Analyst**
-  - read-only SQL analyst → `analyses`
-  - ✅ writes structured analysis incl. skill demand + résumé gap; surfaced in app + digest
+- [x] **Phase 5 — Analyst** (implemented; independent verification next)
+  - [x] `src/analyze.ts` (`npm run analyze`): `assertReadOnly` SQL guard;
+        deterministic mock analysis (top skills + résumé gap + counts) | real
+        Claude agent w/ `query_db` read-only tool → structured `AnalysisSchema`;
+        insert `analyses`. Entry-guarded `main()` so the guard is unit-testable.
+  - [x] `src/server.ts`: `GET /api/analyses`; `public/index.html` Skills tab
+        surfaces the latest analysis (summary + "skills to learn" pills)
+  - [x] `package.json`: `analyze` script
+  - Self-smoke ✅: guard allows SELECT/WITH, blocks DELETE/DROP/UPDATE/INSERT/
+        multi-statement; analyze(mock) stores structured analysis; /api/analyses
+        + /api/skills serve it.
 - [ ] **Phase 6 — Deploy as `/schedule` routine**
   - routine prompt: fetch → check-links → curate/suitability/skills → repair → analyst → digest email
   - ✅ manual routine run completes pipeline end-to-end and sends digest via Gmail

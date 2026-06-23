@@ -60,6 +60,14 @@ async function main() {
     res.json(rows);
   });
 
+  // Latest analyst output (skill demand + résumé gap), or null if none yet.
+  app.get("/api/analyses", async (_req, res) => {
+    const rows = (
+      await db.execute("SELECT id, created_at, kind, content FROM analyses ORDER BY id DESC LIMIT 1")
+    ).rows;
+    res.json(rows[0] ?? null);
+  });
+
   app.post("/api/jobs/:id/stage", async (req, res) => {
     const stage = String(req.body?.stage ?? "");
     if (!STAGES.includes(stage)) {

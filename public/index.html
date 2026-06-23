@@ -27,6 +27,9 @@
     select { font:inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; }
     .muted { color:var(--muted); }
     .empty { padding:32px; text-align:center; color:var(--muted); }
+    .panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:16px; }
+    .panel p { margin:6px 0 12px; } .panel .pill { margin:2px; }
+    .label { font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:4px; }
   </style>
 </head>
 <body>
@@ -110,11 +113,21 @@
     }
 
     async function renderSkills(el) {
-      const skills = await j("/api/skills");
-      if (!skills.length) { el.innerHTML = `<div class="empty">No skills extracted yet.</div>`; return; }
+      const [skills, analysis] = await Promise.all([j("/api/skills"), j("/api/analyses")]);
+      let panel = "";
+      if (analysis && analysis.content) {
+        try {
+          const a = JSON.parse(analysis.content);
+          const gap = (a.gap || []).map(s => `<span class="pill unreviewed">${esc(s)}</span>`).join(" ");
+          panel = `<div class="panel"><div class="label">Analyst summary</div>` +
+            `<p>${esc(a.summary || "")}</p>` +
+            (gap ? `<div class="label">Skills to learn</div><div>${gap}</div>` : "") + `</div>`;
+        } catch {}
+      }
+      if (!skills.length) { el.innerHTML = panel + `<div class="empty">No skills extracted yet.</div>`; return; }
       const rows = skills.map(s =>
         `<tr><td>${esc(s.skill)}</td><td>${esc(s.category)}</td><td class="rel">${s.count}</td></tr>`).join("");
-      el.innerHTML = `<table><thead><tr><th>Skill</th><th>Category</th><th>Jobs</th></tr></thead><tbody>${rows}</tbody></table>`;
+      el.innerHTML = panel + `<table><thead><tr><th>Skill</th><th>Category</th><th>Jobs</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     renderTabs(); render(); loadSummary();

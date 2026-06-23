@@ -13,6 +13,7 @@
     "repair-links": "tsx src/repair-links.ts",
     "poll": "tsx src/email-poller.ts",
     "refine": "tsx src/refine.ts",
+    "analyze": "tsx src/analyze.ts",
     "serve": "tsx src/server.ts",
     "build": "tsc"
   },
