@@ -1,0 +1,13 @@
+{
+  "country": "us",
+  "maxDaysOld": 2,
+  "resultsPerPage": 50,
+  "searches": [
+    { "category": "swe", "what": "software engineer", "where": "United States" },
+    { "category": "swe", "what": "backend engineer", "where": "Remote" },
+    { "category": "swe", "what": "full stack engineer", "where": "United States" },
+    { "category": "mle", "what": "machine learning engineer", "where": "United States" },
+    { "category": "mle", "what": "ml engineer", "where": "Remote" },
+    { "category": "mle", "what": "applied scientist", "where": "United States" }
+  ]
+}
