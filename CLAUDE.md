@@ -9,8 +9,9 @@ curates them against the user's profile and résumé, tracks application progres
 from the user's inbox, surfaces in-demand skills to learn, and emails a daily
 digest — with a local web tracker UI. Built **incrementally in numbered phases**.
 
-**Current state:** Phase 1 (data + ingest) is implemented. Phases 2–6 (judgment,
-web app, email+refine, analyst, scheduled deploy) are not built yet.
+**Current state:** Phases 1–6 are implemented (data+ingest, judgment, web app,
+email+refine, analyst, and the `/schedule` digest routine). See `PROGRESS.md`
+for the authoritative phase status and `ROUTINE.md` for the daily deployment.
 
 The development process is itself part of the project — see "Working in this repo".
 

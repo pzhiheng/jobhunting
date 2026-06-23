@@ -14,6 +14,7 @@
     "poll": "tsx src/email-poller.ts",
     "refine": "tsx src/refine.ts",
     "analyze": "tsx src/analyze.ts",
+    "digest": "tsx src/digest.ts",
     "serve": "tsx src/server.ts",
     "build": "tsc"
   },

@@ -4,9 +4,10 @@ Source of truth for where the build is. Updated at every phase checkpoint.
 See `RESUME.md` for how to resume a paused build, and the approved plan at
 `~/.claude/plans/snappy-foraging-stonebraker.md` for full detail.
 
-**Current phase:** Phase 6 — Deploy as `/schedule` routine (starting)
-**Next action:** build the digest step + routine prompt wiring the full daily
-pipeline; verify a manual mock run end-to-end; then independent verification.
+**Current phase:** Phase 6 — Deploy as `/schedule` routine (implemented;
+independent verification next)
+**Next action:** spawn fresh-context verifier for Phase 6; on PASS the phased
+build is complete (real `/schedule` deploy + Gmail send remain a user action).
 
 **Backlog (non-blocking, from verifiers):** analyze gap uses naive substring
 `includes` (e.g. "Go" suppressed by "good" in résumé) — word-boundary match
@@ -98,9 +99,21 @@ when wiring real credentials.
   - Self-smoke ✅: guard allows SELECT/WITH, blocks DELETE/DROP/UPDATE/INSERT/
         multi-statement; analyze(mock) stores structured analysis; /api/analyses
         + /api/skills serve it.
-- [ ] **Phase 6 — Deploy as `/schedule` routine**
-  - routine prompt: fetch → check-links → curate/suitability/skills → repair → analyst → digest email
-  - ✅ manual routine run completes pipeline end-to-end and sends digest via Gmail
+- [x] **Phase 6 — Deploy as `/schedule` routine** (implemented; independent
+      verification next)
+  - [x] `src/digest.ts` (`npm run digest`): pure DB-read → Markdown email body
+        (`buildDigest` exported). Top picks reuse the app's
+        `top_picks` definition; counts mirror `/api/summary`; Skills block from
+        the latest `analyses` row (summary + résumé-gap "to learn").
+  - [x] `ROUTINE.md`: the `/schedule` routine prompt + prerequisites, wiring
+        fetch → check-links → curate → repair-links → analyze → digest → Gmail.
+  - [x] `package.json`: `digest` script.
+  - Self-smoke ✅ (mock): seed → check-links → curate → repair-links → analyze →
+        digest produced a correct digest (1 top pick = the suitable job with a
+        live link; counts 4/1/2/2/2; skills summary + gap), exit 0, typecheck clean.
+  - ⏳ Real `/schedule` deploy + Gmail send is a **user action** (needs creds +
+        Gmail connector) — pipeline + digest verified; the send is deferred,
+        consistent with prior phases' credentialed happy-paths.
 
 ---
 
