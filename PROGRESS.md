@@ -4,9 +4,8 @@ Source of truth for where the build is. Updated at every phase checkpoint.
 See `RESUME.md` for how to resume a paused build, and the approved plan at
 `~/.claude/plans/snappy-foraging-stonebraker.md` for full detail.
 
-**Current phase:** Phase 1 complete & verified → Phase 2 (Judgment) not started
-**Next action:** Phase 2 needs a résumé file + ANTHROPIC_API_KEY (and Adzuna
-keys for real data) to be meaningfully testable — confirm before starting.
+**Current phase:** Phase 2 — Judgment (implemented; independent verification next)
+**Next action:** spawn fresh-context verifier; then advance to Phase 3 (web app).
 
 ---
 
@@ -32,9 +31,22 @@ keys for real data) to be meaningfully testable — confirm before starting.
         gracefully without Adzuna keys.
   - ⏳ Credentialed happy-paths (real configure with ANTHROPIC key, real fetch
         with ADZUNA keys) pending user-provided credentials — not a defect.
-- [ ] **Phase 2 — Judgment**
-  - relevance score, résumé suitability, skill extraction, `check-links.ts`, link repair
-  - ✅ new rows get relevance/suitability/job_skills/link_status; unsuitable & broken kept
+- [~] **Phase 2 — Judgment** (implemented; independent verification next)
+  - [x] `src/judge.ts`: `JudgmentSchema` + `judgeJob()` (real messages.parse
+        sonnet-4-6 w/ résumé+criteria; deterministic mock under `JOBHUNTER_MOCK`)
+  - [x] `src/resume.ts`: load `resume.md`/`resume.pdf` (null-tolerant)
+  - [x] `src/curate.ts` (`npm run curate`): relevance + suitability + job_skills;
+        status→'reviewed'; never deletes
+  - [x] `src/check-links.ts` (`npm run check-links`): real HTTP HEAD/GET →
+        link_status ok|broken + link_checked_at
+  - [x] `src/repair-links.ts` (`npm run repair-links`): broken → repaired/expired
+        (real LLM+web_search; mock deterministic); never deletes
+  - [x] `src/seed.ts` (`npm run seed`): 4 mock jobs (2 good + 2 bad URLs)
+  - Self-smoke ✅ (mock): seed→curate→check-links→repair-links →
+        relevance/suitability/job_skills set, 2 suitable + 2 unsuitable (kept),
+        2 links ok / 2 broken→expired (kept), skill_demand view populated.
+  - ⏳ Real judgment quality (LLM relevance/suitability/skills, web-search repair)
+        pending résumé + ANTHROPIC key — plumbing verified, quality deferred.
 - [ ] **Phase 3 — Web app**
   - `server.ts` API + `public/index.html`
   - ✅ list/filter; sections Top picks / All / Not suitable / Applied / Skills; tick applied persists

@@ -7,6 +7,10 @@
   "scripts": {
     "configure": "tsx src/configure.ts",
     "fetch": "tsx src/fetch.ts",
+    "seed": "tsx src/seed.ts",
+    "curate": "tsx src/curate.ts",
+    "check-links": "tsx src/check-links.ts",
+    "repair-links": "tsx src/repair-links.ts",
     "build": "tsc"
   },
   "dependencies": {
