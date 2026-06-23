@@ -4,10 +4,8 @@ Source of truth for where the build is. Updated at every phase checkpoint.
 See `RESUME.md` for how to resume a paused build, and the approved plan at
 `~/.claude/plans/snappy-foraging-stonebraker.md` for full detail.
 
-**Current phase:** Phase 3 complete & verified → Phase 4 (Email + refine) not started
-**Next action:** Phase 4 = Gmail OAuth poller (inbound email → app_events + stage)
-+ `refine.ts`. The poller needs Google OAuth creds; `refine` needs ANTHROPIC key.
-Confirm approach (mock vs real) before starting.
+**Current phase:** Phase 4 — Email + refine (implemented; independent verification next)
+**Next action:** spawn fresh-context verifier; then Phase 5 (Analyst).
 
 **Backlog (non-blocking, from verifiers):** repair-links real path uses a greedy
 JSON regex (safe failure mode); mock relevance is uniform (cosmetic). Address
@@ -67,9 +65,17 @@ when wiring real credentials.
   - Self-smoke ✅: seed→pipeline→serve; summary/top_picks/sections correct;
         POST stage 'applied' persists (appears in Applied section); invalid
         stage → 400; index.html served (200).
-- [ ] **Phase 4 — Email + refine**
-  - Gmail OAuth poller; `refine.ts`
-  - ✅ poller classifies mail → app_events + stage; `npm run refine` updates filter.json
+- [x] **Phase 4 — Email + refine** (implemented; independent verification next)
+  - [x] `src/email-poller.ts` (`npm run poll`): fetch (mock fixture | real Gmail
+        REST via OAuth refresh-token + native fetch — no heavy deps), classify
+        (mock keywords | real messages.parse), match by company → `app_events`
+        (dedup by email_id) + advance `stage`
+  - [x] `src/refine.ts` (`npm run refine "<instruction>"`): current filter +
+        DB signal → updated filter.json (real messages.parse | deterministic mock)
+  - [x] `.env.example` GOOGLE_* ; `package.json` poll/refine scripts
+  - Self-smoke ✅ (mock): poll → 4 events, 4 stage advances (confirmed/oa/
+        interview/rejected), re-poll dedups (0 new); refine rewrites filter.json
+        from the instruction using live DB signal.
 - [ ] **Phase 5 — Analyst**
   - read-only SQL analyst → `analyses`
   - ✅ writes structured analysis incl. skill demand + résumé gap; surfaced in app + digest
