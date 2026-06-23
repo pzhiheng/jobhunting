@@ -4,8 +4,14 @@ Source of truth for where the build is. Updated at every phase checkpoint.
 See `RESUME.md` for how to resume a paused build, and the approved plan at
 `~/.claude/plans/snappy-foraging-stonebraker.md` for full detail.
 
-**Current phase:** Phase 4 — Email + refine (implemented; independent verification next)
-**Next action:** spawn fresh-context verifier; then Phase 5 (Analyst).
+**Current phase:** Phase 4 complete & verified → Phase 5 (Analyst) in progress
+**Next action:** build `src/analyze.ts` (read-only SQL analyst → analyses) +
+surface in the web app; mock-testable via seed.
+
+**Backlog (non-blocking, from verifiers):** repair-links greedy JSON regex (safe);
+app_events email_id no UNIQUE + non-atomic check-insert (fine for serial CLI);
+findJob bidirectional substring could mis-match short company names. Revisit with
+real credentials.
 
 **Backlog (non-blocking, from verifiers):** repair-links real path uses a greedy
 JSON regex (safe failure mode); mock relevance is uniform (cosmetic). Address
@@ -65,7 +71,8 @@ when wiring real credentials.
   - Self-smoke ✅: seed→pipeline→serve; summary/top_picks/sections correct;
         POST stage 'applied' persists (appears in Applied section); invalid
         stage → 400; index.html served (200).
-- [x] **Phase 4 — Email + refine** (implemented; independent verification next)
+- [x] **Phase 4 — Email + refine** (committed `efb3811`; independently verified
+      → `VERIFY.md`: **PASS**, all 6 criteria)
   - [x] `src/email-poller.ts` (`npm run poll`): fetch (mock fixture | real Gmail
         REST via OAuth refresh-token + native fetch — no heavy deps), classify
         (mock keywords | real messages.parse), match by company → `app_events`
