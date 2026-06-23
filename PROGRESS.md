@@ -4,18 +4,20 @@ Source of truth for where the build is. Updated at every phase checkpoint.
 See `RESUME.md` for how to resume a paused build, and the approved plan at
 `~/.claude/plans/snappy-foraging-stonebraker.md` for full detail.
 
-**Current phase:** Phase 6 — Deploy as `/schedule` routine (implemented;
-independent verification next)
-**Next action:** spawn fresh-context verifier for Phase 6; on PASS the phased
-build is complete (real `/schedule` deploy + Gmail send remain a user action).
+**Current phase:** ✅ Build complete — all 6 phases implemented and independently
+verified. Remaining work is a **user action**: populate `.env` (Anthropic/Adzuna/
+Turso/Google) + `resume.*`, run `configure`, then deploy `ROUTINE.md` via
+`/schedule` with the Gmail connector.
+**Next action:** none in the build loop. Credentialed happy-paths (real fetch,
+real LLM judgment quality, real Gmail send) are exercised on first deploy.
 
 **Backlog (non-blocking, from verifiers):** analyze gap uses naive substring
 `includes` (e.g. "Go" suppressed by "good" in résumé) — word-boundary match
 would be cleaner; analyze `db.close()` only on happy path (no try/finally,
 harmless on exit); repair-links greedy JSON regex (safe);
 app_events email_id no UNIQUE + non-atomic check-insert (fine for serial CLI);
-findJob bidirectional substring could mis-match short company names. Revisit with
-real credentials.
+findJob bidirectional substring could mis-match short company names; digest
+counts line has no singular form ("1 top picks"). Revisit with real credentials.
 
 **Backlog (non-blocking, from verifiers):** repair-links real path uses a greedy
 JSON regex (safe failure mode); mock relevance is uniform (cosmetic). Address
@@ -99,8 +101,8 @@ when wiring real credentials.
   - Self-smoke ✅: guard allows SELECT/WITH, blocks DELETE/DROP/UPDATE/INSERT/
         multi-statement; analyze(mock) stores structured analysis; /api/analyses
         + /api/skills serve it.
-- [x] **Phase 6 — Deploy as `/schedule` routine** (implemented; independent
-      verification next)
+- [x] **Phase 6 — Deploy as `/schedule` routine** (committed `e56a714`;
+      independently verified → `VERIFY.md`: **PASS**, all 7 criteria green)
   - [x] `src/digest.ts` (`npm run digest`): pure DB-read → Markdown email body
         (`buildDigest` exported). Top picks reuse the app's
         `top_picks` definition; counts mirror `/api/summary`; Skills block from
