@@ -4,16 +4,17 @@ Source of truth for where the build is. Updated at every phase checkpoint.
 See `RESUME.md` for how to resume a paused build, and the approved plan at
 `~/.claude/plans/snappy-foraging-stonebraker.md` for full detail.
 
-**Current phase:** Phase 1 — Data + ingest (in progress)
-**Next action:** implement the libSQL DB layer, filter schema, configure CLI,
-sources, and fetch entry; then independent Reviewer + Tester verify.
+**Current phase:** Phase 1 complete & verified → Phase 2 (Judgment) not started
+**Next action:** Phase 2 needs a résumé file + ANTHROPIC_API_KEY (and Adzuna
+keys for real data) to be meaningfully testable — confirm before starting.
 
 ---
 
 ## Phases
 
 - [x] **Phase 0 — Resume & progress docs** (committed `334a621`)
-- [~] **Phase 1 — Data + ingest** (implemented; independent verification next)
+- [x] **Phase 1 — Data + ingest** (committed `6aeb070`; independently verified
+      → `VERIFY.md`: **PASS WITH NOTES**, all 6 criteria green)
   - [x] `package.json`: dropped better-sqlite3 → `@libsql/client`,
         `@anthropic-ai/sdk@0.105`, `zod@4`; scripts `configure`, `fetch`
   - [x] `src/filter.ts`: zod `FilterSchema`/`ParsedFilterSchema` + `toSearchConfig`
