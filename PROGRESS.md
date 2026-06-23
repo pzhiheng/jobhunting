@@ -4,10 +4,14 @@ Source of truth for where the build is. Updated at every phase checkpoint.
 See `RESUME.md` for how to resume a paused build, and the approved plan at
 `~/.claude/plans/snappy-foraging-stonebraker.md` for full detail.
 
-**Current phase:** Phase 5 — Analyst (implemented; independent verification next)
-**Next action:** spawn fresh-context verifier; then Phase 6 (deploy as /schedule routine).
+**Current phase:** Phase 6 — Deploy as `/schedule` routine (starting)
+**Next action:** build the digest step + routine prompt wiring the full daily
+pipeline; verify a manual mock run end-to-end; then independent verification.
 
-**Backlog (non-blocking, from verifiers):** repair-links greedy JSON regex (safe);
+**Backlog (non-blocking, from verifiers):** analyze gap uses naive substring
+`includes` (e.g. "Go" suppressed by "good" in résumé) — word-boundary match
+would be cleaner; analyze `db.close()` only on happy path (no try/finally,
+harmless on exit); repair-links greedy JSON regex (safe);
 app_events email_id no UNIQUE + non-atomic check-insert (fine for serial CLI);
 findJob bidirectional substring could mis-match short company names. Revisit with
 real credentials.
@@ -82,7 +86,8 @@ when wiring real credentials.
   - Self-smoke ✅ (mock): poll → 4 events, 4 stage advances (confirmed/oa/
         interview/rejected), re-poll dedups (0 new); refine rewrites filter.json
         from the instruction using live DB signal.
-- [x] **Phase 5 — Analyst** (implemented; independent verification next)
+- [x] **Phase 5 — Analyst** (committed `d32287e`; independently verified
+      → `VERIFY.md`: **PASS WITH NOTES**, all 6 criteria green)
   - [x] `src/analyze.ts` (`npm run analyze`): `assertReadOnly` SQL guard;
         deterministic mock analysis (top skills + résumé gap + counts) | real
         Claude agent w/ `query_db` read-only tool → structured `AnalysisSchema`;
