@@ -4,8 +4,10 @@ Source of truth for where the build is. Updated at every phase checkpoint.
 See `RESUME.md` for how to resume a paused build, and the approved plan at
 `~/.claude/plans/snappy-foraging-stonebraker.md` for full detail.
 
-**Current phase:** Phase 3 — Web app (implemented; independent verification next)
-**Next action:** spawn fresh-context verifier; then Phase 4 (email + refine).
+**Current phase:** Phase 3 complete & verified → Phase 4 (Email + refine) not started
+**Next action:** Phase 4 = Gmail OAuth poller (inbound email → app_events + stage)
++ `refine.ts`. The poller needs Google OAuth creds; `refine` needs ANTHROPIC key.
+Confirm approach (mock vs real) before starting.
 
 **Backlog (non-blocking, from verifiers):** repair-links real path uses a greedy
 JSON regex (safe failure mode); mock relevance is uniform (cosmetic). Address
@@ -52,7 +54,9 @@ when wiring real credentials.
         2 links ok / 2 broken→expired (kept), skill_demand view populated.
   - ⏳ Real judgment quality (LLM relevance/suitability/skills, web-search repair)
         pending résumé + ANTHROPIC key — plumbing verified, quality deferred.
-- [x] **Phase 3 — Web app** (implemented; independent verification next)
+- [x] **Phase 3 — Web app** (committed `119482c`; independently verified
+      → `VERIFY.md`: **PASS**, all 7 criteria; applied `esc()` attribute-escaping
+      hardening per verifier's minor note)
   - [x] `src/server.ts`: Express JSON API — `GET /api/jobs?section=`
         (top_picks/all/not_suitable/applied), `GET /api/skills`, `GET /api/summary`,
         `POST /api/jobs/:id/stage` (validated); serves `public/`

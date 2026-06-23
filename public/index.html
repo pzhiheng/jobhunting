@@ -69,7 +69,7 @@
       }
     }
 
-    function esc(v) { return String(v ?? "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+    function esc(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
     async function setStage(id, stage) {
       await j(`/api/jobs/${encodeURIComponent(id)}/stage`, {

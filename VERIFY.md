@@ -1,54 +1,64 @@
-# Phase 2 Verification — Independent Review ("Judgment")
+# Phase 3 Verification — Web app (Express API + vanilla-JS tracker)
 
-Verifier: independent (no prior context). Date: 2026-06-23. Git HEAD: `d48d8c1 Phase 2: judgment (curate, check-links, repair-links, seed)`.
-Constraints honored: no real ANTHROPIC/ADZUNA/Turso credentials used; `JOBHUNTER_MOCK=1` set for all curate/repair-links runs; real-LLM judgment quality marked pending; no source file modified; nothing committed; all temp artifacts removed; fresh local `jobs.db` used and cleaned up.
+Independent verifier. No prior context. Verified against git HEAD `119482c "Phase 3: web app (Express API + vanilla-JS tracker UI)"`. Date: 2026-06-23.
 
-## Overall verdict: PASS WITH NOTES
+Setup ran clean from project root:
+`rm -f jobs.db* && npm run seed && JOBHUNTER_MOCK=1 npm run curate && npm run check-links && JOBHUNTER_MOCK=1 npm run repair-links`
+- seed: 4 jobs (4 new)
+- curate: 2 suitable, 2 unsuitable
+- check-links: 2 ok, 2 broken
+- repair-links: 0 repaired, 2 marked expired
 
-All five acceptance criteria pass. The Phase 2 goal is met: new rows get relevance(1–5), suitability, job_skills, and link_status set; unsuitable and broken/expired jobs are retained (total count stays 4, nothing deleted). Notes below are low-severity robustness observations on the real-LLM paths, none of which affect the mock pipeline or block the phase.
+Server started with `PORT=3188 npm run serve`, tests run against http://localhost:3188.
 
----
+## Results
 
-## Acceptance criteria
+| # | Criterion | Verdict |
+|---|-----------|---------|
+| 1 | `npx tsc --noEmit` exit 0 | **PASS** — exit 0 |
+| 2 | `/api/summary` total=4, top_picks>=1, not_suitable=2, broken=2 | **PASS** |
+| 3 | section filters (top_picks / not_suitable / all) | **PASS** |
+| 4 | PERSISTENCE — POST stage=applied → 200, GET applied shows it | **PASS** |
+| 5 | bogus stage → 400; unknown id → 404 | **PASS** |
+| 6 | `GET /` → 200 + HTML tracker page | **PASS** |
+| 7 | Code review for real issues (SQLi / enum / XSS / bound params) | **PASS** (1 minor note) |
 
-### 1. `npx tsc --noEmit` — PASS
-Exit 0, no errors. tsconfig is strict + `moduleResolution: Bundler`. SDK API surface used by `src/judge.ts` was verified against `@anthropic-ai/sdk@0.105.0` type defs: `messages.parse` (messages.d.ts:52), `output_config`/`OutputConfig` (messages.d.ts:2077), `parsed_output`, `zodOutputFormat` (helpers/zod.d.ts:12), and `web_search_20260209` (messages.d.ts:1883) all exist as used.
+### 1. tsc
+`npx tsc --noEmit` → exit 0. No type errors.
 
-### 2. Mock pipeline against a fresh DB — PASS
-Ran `rm -f jobs.db*` → `npm run seed` → `JOBHUNTER_MOCK=1 npm run curate` → `npm run check-links` → `JOBHUNTER_MOCK=1 npm run repair-links`. Console: "Seeded 4 (4 new)", "Curated 4: 2 suitable, 2 unsuitable (kept)", "Checked 4: 2 ok, 2 broken", "Repaired 0, marked expired 2 (kept)".
+### 2. /api/summary
+`{"total":4,"top_picks":1,"suitable":2,"not_suitable":2,"applied":0,"new":0,"broken":2}`
+total=4 ✓, top_picks=1 (>=1) ✓, not_suitable=2 ✓, broken=2 ✓.
 
-DB inspection (file:jobs.db) results — all checks TRUE:
-- Total jobs == 4 (nothing deleted). PASS
-- Every job `status='reviewed'`. PASS
-- Every `relevance` is an integer in [1,5] (all 3 — see Note A). PASS
-- Every `suitability` ∈ {suitable,unsuitable} (suitable,unsuitable,unsuitable,suitable). PASS
-- Every job has ≥1 `job_skills` row (3 each). PASS
-- ≥1 unsuitable job retained (2 unsuitable, total still 4) → confirms unsuitable retention. PASS
-- Link checking: **this sandbox HAS outbound network** — both reachable URLs (example.com, example.org) → `link_status='ok'`; both `.invalid` URLs → `broken`. PASS (no environmental caveat needed.)
-- repair-links (mock): the 2 broken `.invalid` jobs → `expired` (deterministic: `hash(job.id)%2` gave expired for both seed:2/seed:4), both STILL present (count unchanged) → confirms broken/expired retention. PASS
+### 3. Section filtering
+- `?section=top_picks` → 1 job: `seed:1 suitable rel=5 link=ok`. Each is suitable, relevance>=4, link not broken/expired ✓. (seed:4 is suitable but link=expired → correctly excluded, confirming the link-status guard at server.ts:20.)
+- `?section=not_suitable` → 2 jobs (seed:2, seed:3), both `suitability=unsuitable` ✓.
+- `?section=all` → 4 jobs ✓.
 
-### 3. No `DELETE FROM jobs` in curate.ts / repair-links.ts — PASS
-`grep -rn "DELETE FROM jobs" src/` → none. The only DELETE is `curate.ts:63` `DELETE FROM job_skills WHERE job_id = :id` (the idempotent per-job skill refresh — explicitly allowed). repair-links.ts has zero DELETE statements; seed.ts has none.
+### 4. Persistence (the Phase 3 acceptance bar)
+`POST /api/jobs/seed:1/stage {"stage":"applied"}` → 200 `{"id":"seed:1","stage":"applied"}`.
+`GET /api/jobs?section=applied` → 1 row `seed:1 stage=applied`. Stage change persisted to the DB and surfaces in the Applied section. ✓
 
-### 4. Error path — PASS
-- No `filter.json` present, no `JOBHUNTER_MOCK`: `npm run curate` prints "No filter.json found. Run `npm run configure \"<what you want>\"` first." and exits 1. PASS (`curate.ts:21`, error via `console.error`+`process.exit(1)`).
-- No `filter.json`, with `JOBHUNTER_MOCK=1`: falls back to `DEFAULT_CRITERIA` (`curate.ts:20`) and runs cleanly, exit 0. PASS (ran 0 rows because the earlier run already marked all jobs reviewed — the fallback path itself executed without throwing, which is what's under test).
+### 5. Validation / errors
+- `POST .../stage {"stage":"bogus"}` → 400 with enum message ✓ (server.ts:65).
+- `POST /api/jobs/does-not-exist/stage {"stage":"applied"}` → 404 `{"error":"job not found"}` ✓ (server.ts:73, keyed on `rowsAffected === 0`).
 
-### 5. Code review for real issues — PASS (with notes)
-- **judge structured output + clamp:** `client.messages.parse` with `output_config.format = zodOutputFormat(JudgmentSchema)`, then `parsed_output` null-guarded (judge.ts:67-69) and `relevance: clamp(Math.round(parsed.relevance), 1, 5)` (judge.ts:71). Correct — the schema intentionally drops the 1..5 numeric bound (structured outputs don't support `minimum`/`maximum`) and clamps post-parse. Model id `claude-sonnet-4-6` matches spec. Resume text/PDF blocks use valid `ContentBlockParam` shapes (`document`+base64 for PDF). PASS
-- **async/SQL param binding:** All writes use named-param binding (`:id`, `:rel`, …) with `args` objects — no string interpolation, no injection. Awaits are correctly sequenced; `db.close()` after the loop. PASS
-- **repair-links pause_turn loop + JSON parse:** Bounded 4-iteration loop; breaks when `stop_reason !== 'pause_turn'`, else pushes `{role:'assistant', content: response.content}` and re-sends — matches the documented server-side-tool resume pattern (no spurious "Continue" user turn). Final text filtered to TextBlocks, greedy `/\{[\s\S]*\}/` JSON match, validates `action==='repaired' && typeof url==='string'`, else `expired`. PASS — see Note B.
-- **check-links HEAD→GET fallback + timeout:** HEAD first; `<400`→ok; 403/405→fall through to GET; other ≥400→broken; network/abort error on HEAD→retry GET, on GET→broken. `AbortSignal.timeout(10s)` per request. Logic verified empirically (reachable→ok, .invalid→broken). PASS
-- **mock determinism:** `judge.mockJudgment` uses a stable `hash(title)` for relevance/suitability and a substring scan of title+description against a fixed SKILL_VOCAB (falls back to `["general-software"]` if none match — so the ≥1-skill invariant always holds). `repair-links.mockRepair` uses `hash(job.id)%2`. Both deterministic, no API call when `JOBHUNTER_MOCK` set. PASS
+### 6. Static page
+`GET /` → 200, body begins `<!doctype html>` (the tracker). Static middleware serves `public/` (server.ts:80). ✓
 
----
+### 7. Code review — security & correctness
 
-## Notes (non-blocking)
+- **SQL injection via `section`** — SAFE. `src/server.ts:47` does `SECTIONS[String(req.query.section ?? "all")] ?? SECTIONS.all`: a whitelist map lookup with a safe default. The `where`/`order` fragments interpolated into SQL (server.ts:50) are server-controlled constants from the `SECTIONS` table (server.ts:17-25); user input never reaches the SQL string. An unknown/garbage `section` falls back to `all`.
+- **Stage enum validation** — SAFE. `src/server.ts:64-68` rejects any stage not in `STAGES` with 400 before the UPDATE.
+- **Bound DB params** — SAFE. The stage UPDATE uses named args (`:stage`, `:id`) via the libSQL client (server.ts:69-72). All summary/section COUNT/SELECT queries interpolate only server constants, no user data. `src/db.ts` upsert/lookups also use bound named args.
+- **XSS in UI** — SAFE in practice. `public/index.html:72` `esc()` escapes `& < >` and is applied to every DB/user string injected into the table (title, location, company, category, suitability, link_status, id) and to the skills view. Stage `<option>` values come from the client-side `STAGES` constant, not the DB.
+  - MINOR NOTE (not a bug, no exploit with current data): `job.url` is placed into an `href="..."` attribute (index.html:91) and `job.id` into `data-id="..."` (index.html:109) via `esc`, which escapes `<>&` but not double-quotes. A DB value containing a literal `"` could break out of the attribute. Seeded/Adzuna URLs and ids don't contain quotes, so this is unreachable today; attribute-context escaping (also encoding `"`/`'`) would be more defensive. Flagging for awareness only — does not affect Phase 3 acceptance.
 
-- **Note A — relevance all 3:** Coincidental, not a bug. Mock relevance is `(hash(title)%5)+1`; all four seed titles happen to hash to `%5==2`. Still satisfies "integer in [1,5]". Suitability `hash(title)%2` correctly yields a 2/2 split, which is what exercises unsuitable retention. If you want the seed to visibly span the relevance range, vary the mock formula or seed titles — purely cosmetic.
-- **Note B — greedy JSON regex in real repair path:** `/\{[\s\S]*\}/` spans from the first `{` to the last `}`. If the real model ever emits prose containing a second brace-delimited object before/after the answer JSON, `JSON.parse` fails and the result falls through to `expired`. The system prompt mandates "ONE line of strict JSON, nothing else", and the failure mode is the safe one (job retained as expired, never deleted), so this is a low-severity edge case on the real path only — flagged, not a defect. Pending credentials, real-LLM repair/judgment quality is "not a defect".
+## Cleanup
+- Server killed (`kill`/`pkill -f src/server.ts`); port 3188 no longer listening (curl returns 000).
+- `rm -f jobs.db jobs.db-wal jobs.db-shm` done.
+- `git status --short` was clean before writing this file; after this write only `VERIFY.md` is modified. No source files modified, nothing committed.
 
-## Cleanup / integrity
-- `rm -f jobs.db jobs.db-wal jobs.db-shm` performed; all temporary `__verify_*.mjs` scripts removed.
-- `jobs.db` confirmed gitignored (`git check-ignore jobs.db`).
-- `git status --short` shows only `VERIFY.md` modified; no source files touched, nothing committed.
+## Overall verdict: **PASS**
+
+All 7 criteria pass. The Phase 3 goal — "list/filter; sections present; ticking applied persists" — is met: sections filter correctly (incl. the top_picks link-status guard), and a stage change round-trips to the DB and reappears in the Applied section. One minor, non-exploitable hardening note on attribute-context HTML escaping; no blocking issues.
