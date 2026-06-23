@@ -1,4 +1,4 @@
-import type { JobSource, NormalizedJob, Profile, Search } from "./types.js";
+import type { JobSource, NormalizedJob, SearchConfig, Search } from "./types.js";
 
 interface AdzunaResult {
   id: string;
@@ -18,7 +18,7 @@ const BASE = "https://api.adzuna.com/v1/api/jobs";
 export const adzuna: JobSource = {
   name: "adzuna",
 
-  async fetch(profile: Profile): Promise<NormalizedJob[]> {
+  async fetch(config: SearchConfig): Promise<NormalizedJob[]> {
     const appId = process.env.ADZUNA_APP_ID;
     const appKey = process.env.ADZUNA_APP_KEY;
     if (!appId || !appKey) {
@@ -28,8 +28,8 @@ export const adzuna: JobSource = {
     }
 
     const jobs: NormalizedJob[] = [];
-    for (const search of profile.searches) {
-      const results = await runSearch(profile, search, appId, appKey);
+    for (const search of config.searches) {
+      const results = await runSearch(config, search, appId, appKey);
       for (const r of results) {
         jobs.push(normalize(r, search.category));
       }
@@ -39,7 +39,7 @@ export const adzuna: JobSource = {
 };
 
 async function runSearch(
-  profile: Profile,
+  config: SearchConfig,
   search: Search,
   appId: string,
   appKey: string,
@@ -47,13 +47,13 @@ async function runSearch(
   const params = new URLSearchParams({
     app_id: appId,
     app_key: appKey,
-    results_per_page: String(profile.resultsPerPage),
+    results_per_page: String(config.resultsPerPage),
     what: search.what,
     where: search.where,
-    max_days_old: String(profile.maxDaysOld),
+    max_days_old: String(config.maxDaysOld),
     "content-type": "application/json",
   });
-  const url = `${BASE}/${profile.country}/search/1?${params}`;
+  const url = `${BASE}/${config.country}/search/1?${params}`;
 
   const res = await fetch(url);
   if (!res.ok) {

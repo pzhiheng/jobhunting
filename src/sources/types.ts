@@ -4,7 +4,8 @@ export interface Search {
   where: string;
 }
 
-export interface Profile {
+/** The slice of the filter a job source needs to run its API queries. */
+export interface SearchConfig {
   country: string;
   maxDaysOld: number;
   resultsPerPage: number;
@@ -29,5 +30,5 @@ export interface NormalizedJob {
 
 export interface JobSource {
   name: string;
-  fetch(profile: Profile): Promise<NormalizedJob[]>;
+  fetch(config: SearchConfig): Promise<NormalizedJob[]>;
 }
