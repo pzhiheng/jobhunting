@@ -1,9 +1,24 @@
 import "dotenv/config";
 import express from "express";
+import { spawn } from "node:child_process";
 import { openDb } from "./db.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const PUBLIC_DIR = new URL("../public", import.meta.url).pathname;
+
+// Allow-list of pipeline npm scripts runnable from the control panel.
+const COMMANDS: { id: string; label: string; script: string; takesArg: boolean }[] = [
+  { id: "seed", label: "Seed sample jobs", script: "seed", takesArg: false },
+  { id: "fetch", label: "Fetch from job boards", script: "fetch", takesArg: false },
+  { id: "check-links", label: "Check links", script: "check-links", takesArg: false },
+  { id: "curate", label: "Curate (relevance + suitability)", script: "curate", takesArg: false },
+  { id: "repair-links", label: "Repair links", script: "repair-links", takesArg: false },
+  { id: "analyze", label: "Analyze skills", script: "analyze", takesArg: false },
+  { id: "digest", label: "Build digest", script: "digest", takesArg: false },
+  { id: "poll", label: "Poll inbox", script: "poll", takesArg: false },
+  { id: "configure", label: "Configure search", script: "configure", takesArg: true },
+  { id: "refine", label: "Refine filter", script: "refine", takesArg: true },
+];
 
 const STAGES = [
   "not_applied", "applied", "confirmed", "oa", "interview", "offer", "rejected",
@@ -85,9 +100,54 @@ async function main() {
     res.json({ id: req.params.id, stage });
   });
 
+  // Control panel: the allow-list of runnable pipeline commands.
+  app.get("/api/commands", (_req, res) => {
+    res.json(COMMANDS);
+  });
+
+  // Run an allow-listed command via npm and return its output.
+  app.post("/api/run", (req, res) => {
+    const command = String(req.body?.command ?? "");
+    const cmd = COMMANDS.find((c) => c.id === command);
+    if (!cmd) {
+      res.status(400).json({ error: `unknown command: ${command}` });
+      return;
+    }
+    const rawArg = String(req.body?.arg ?? "").trim();
+    const args = cmd.takesArg && rawArg ? [rawArg] : [];
+
+    const child = spawn("npm", ["run", command, ...args], {
+      cwd: process.cwd(),
+      env: process.env,
+      shell: false,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const timer = setTimeout(() => child.kill("SIGKILL"), 5 * 60 * 1000);
+
+    child.stdout.on("data", (d) => { stdout += d.toString(); });
+    child.stderr.on("data", (d) => { stderr += d.toString(); });
+
+    child.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      res.status(500).json({ error: err.message });
+    });
+
+    child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      res.json({ command, exitCode: code, stdout, stderr });
+    });
+  });
+
   app.use(express.static(PUBLIC_DIR));
 
-  app.listen(PORT, () => {
+  app.listen(PORT, "127.0.0.1", () => {
     console.log(`Job tracker on http://localhost:${PORT}`);
   });
 }

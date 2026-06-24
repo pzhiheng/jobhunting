@@ -30,6 +30,14 @@
     .panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:16px; }
     .panel p { margin:6px 0 12px; } .panel .pill { margin:2px; }
     .label { font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:4px; }
+    .cmds { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+    .cmd { display:flex; align-items:center; gap:4px; }
+    .cmd button { font:inherit; padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--fg); cursor:pointer; }
+    .cmd button:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+    .cmd button:disabled { opacity:.5; cursor:default; }
+    .cmd input { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px; width:200px; }
+    .log { background:#0f172a; color:#e2e8f0; border-radius:8px; padding:14px 16px; max-height:420px; overflow:auto; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; word-break:break-word; }
+    .log .badge { font-weight:600; } .log .badge.ok { color:#4ade80; } .log .badge.fail { color:#f87171; }
   </style>
 </head>
 <body>
@@ -42,6 +50,7 @@
 
   <script>
     const SECTIONS = [
+      { key: "run", label: "Run" },
       { key: "top_picks", label: "Top picks" },
       { key: "all", label: "All" },
       { key: "not_suitable", label: "Not suitable" },
@@ -85,6 +94,7 @@
 
     async function render() {
       const el = document.getElementById("content");
+      if (active === "run") return renderRun(el);
       if (active === "skills") return renderSkills(el);
 
       const jobs = await j(`/api/jobs?section=${active}`);
@@ -128,6 +138,51 @@
       const rows = skills.map(s =>
         `<tr><td>${esc(s.skill)}</td><td>${esc(s.category)}</td><td class="rel">${s.count}</td></tr>`).join("");
       el.innerHTML = panel + `<table><thead><tr><th>Skill</th><th>Category</th><th>Jobs</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    let commands = null;
+
+    async function renderRun(el) {
+      if (!commands) commands = await j("/api/commands");
+      const buttons = commands.map(c =>
+        `<div class="cmd">
+           <button data-cmd="${esc(c.id)}">${esc(c.label)}</button>` +
+        (c.takesArg ? `<input data-arg="${esc(c.id)}" placeholder="argument…" />` : "") +
+        `</div>`).join("");
+      el.innerHTML =
+        `<div class="cmds">${buttons}</div>` +
+        `<div class="log" id="runlog"><span class="muted">Click a command to run it.</span></div>`;
+      const log = el.querySelector("#runlog");
+      el.querySelectorAll("button[data-cmd]").forEach(btn => {
+        btn.onclick = () => runCommand(el, btn.dataset.cmd, log);
+      });
+    }
+
+    async function runCommand(el, id, log) {
+      const buttons = el.querySelectorAll("button[data-cmd]");
+      buttons.forEach(b => b.disabled = true);
+      const input = el.querySelector(`input[data-arg="${id}"]`);
+      const arg = input ? input.value.trim() : "";
+      log.innerHTML = `<span class="muted">Running ${esc(id)}…</span>`;
+      try {
+        const r = await j("/api/run", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify(arg ? { command: id, arg } : { command: id }),
+        });
+        if (r.error) {
+          log.innerHTML = `<span class="badge fail">✗</span> ${esc(r.error)}`;
+        } else {
+          const ok = r.exitCode === 0;
+          const badge = `<span class="badge ${ok ? "ok" : "fail"}">${ok ? "✓" : "✗"} ${esc(id)} (exit ${r.exitCode})</span>`;
+          const err = r.stderr ? `\n\n--- stderr ---\n${esc(r.stderr)}` : "";
+          log.innerHTML = `${badge}\n\n${esc(r.stdout) || "(no output)"}${err}`;
+          if (ok) { loadSummary(); }  // refresh counts so other tabs show fresh data
+        }
+      } catch (e) {
+        log.innerHTML = `<span class="badge fail">✗</span> ${esc(e.message || e)}`;
+      } finally {
+        buttons.forEach(b => b.disabled = false);
+      }
     }
 
     renderTabs(); render(); loadSummary();
