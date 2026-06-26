@@ -20,14 +20,20 @@ queries, 403≠broken link check, Haiku for curate, Adzuna pagination (`maxPages
 routine** ("job-hunter-daily-digest", 4:01 PM, runs the pipeline + emails the
 digest via Gmail). Runs locally while the Claude app is open.
 
-**Open enhancements (offered, not yet built):**
-- **A — Batch curate:** rework `curate.ts`/`judge.ts` to use the Message Batches
-  API (50% cheaper, no rate-limit pacing). Marginal at ~67 jobs/day on Haiku;
-  worth it when volume scales.
-- **B — Direct company links:** add a keyless **Greenhouse/Lever/Ashby**
-  `JobSource` — Adzuna only returns its own `redirect_url` (403s bots; no
-  employer URL field), so company-board sources are the only way to get direct
-  apply links. Recommended next.
+**Shipped enhancements:**
+- **B — Direct company links** (`0bfed6f`): `src/sources/companyBoards.ts` — keyless
+  Greenhouse/Lever/Ashby boards (companies in `companies.json`) → **direct employer
+  apply URLs**. Title-filtered via `makeKeepFilter` (word-boundary intern gate +
+  role keywords). Verified live: 23 intern postings, all direct (200, no Adzuna
+  redirect).
+- **A — Batch curate**: `judge.ts` gains `judgeJobsBatch` (Message Batches API,
+  50% cheaper, no rate-limit pacing); `curate.ts` submits one batch per run.
+  Verified live (2-job batch, ~2 min, correct discrimination). Errored requests
+  are deferred (stay `new`, retried next run). `judgeJob` (single) retained for
+  the mock + any non-batch use.
+
+**Backlog idea:** company-board source could also pre-drop PhD-required titles to
+save curate calls (currently left to the criteria dealbreaker).
 
 **Backlog (non-blocking, from verifiers):** analyze gap uses naive substring
 `includes` (e.g. "Go" suppressed by "good" in résumé) — word-boundary match

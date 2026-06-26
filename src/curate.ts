@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { readFileSync } from "node:fs";
 import { openDb } from "./db.js";
-import { judgeJob } from "./judge.js";
+import { judgeJobsBatch } from "./judge.js";
 import { loadResume } from "./resume.js";
 import { FilterSchema, type Criteria } from "./filter.js";
 
@@ -33,25 +33,36 @@ async function main() {
   const { rows } = await db.execute(
     "SELECT id, title, company, location, description, category FROM jobs WHERE status = 'new'",
   );
+  const jobs = rows.map((r) => ({
+    id: String(r.id),
+    title: String(r.title),
+    company: String(r.company ?? ""),
+    location: String(r.location ?? ""),
+    description: String(r.description ?? ""),
+    category: String(r.category ?? ""),
+  }));
+
+  if (jobs.length === 0) {
+    db.close();
+    console.log("Nothing new to curate.");
+    return;
+  }
+
+  // One Message Batch for the whole set (50% cheaper, no rate-limit pacing).
+  const judgments = await judgeJobsBatch(jobs, { criteria, resume });
 
   let reviewed = 0;
   let suitable = 0;
-  for (const r of rows) {
-    const job = {
-      title: String(r.title),
-      company: String(r.company ?? ""),
-      location: String(r.location ?? ""),
-      description: String(r.description ?? ""),
-      category: String(r.category ?? ""),
-    };
-    const j = await judgeJob(job, { criteria, resume });
+  for (const job of jobs) {
+    const j = judgments.get(job.id);
+    if (!j) continue; // request errored — leave status='new' to retry next run
 
     await db.execute({
       sql: `UPDATE jobs SET relevance = :rel, relevance_notes = :relNotes,
               suitability = :suit, suitability_notes = :suitNotes, status = 'reviewed'
             WHERE id = :id`,
       args: {
-        id: r.id as string,
+        id: job.id,
         rel: j.relevance,
         relNotes: j.relevanceNotes,
         suit: j.suitability,
@@ -60,11 +71,11 @@ async function main() {
     });
 
     // refresh skills idempotently
-    await db.execute({ sql: "DELETE FROM job_skills WHERE job_id = :id", args: { id: r.id as string } });
+    await db.execute({ sql: "DELETE FROM job_skills WHERE job_id = :id", args: { id: job.id } });
     for (const skill of j.skills) {
       await db.execute({
         sql: "INSERT OR IGNORE INTO job_skills (job_id, skill) VALUES (:id, :skill)",
-        args: { id: r.id as string, skill },
+        args: { id: job.id, skill },
       });
     }
 
@@ -73,8 +84,10 @@ async function main() {
   }
   db.close();
 
+  const deferred = jobs.length - reviewed;
   console.log(
-    `Curated ${reviewed} job(s): ${suitable} suitable, ${reviewed - suitable} unsuitable (kept).`,
+    `Curated ${reviewed} job(s): ${suitable} suitable, ${reviewed - suitable} unsuitable (kept).` +
+      (deferred ? ` ${deferred} deferred (batch errors, will retry).` : ""),
   );
 }
 

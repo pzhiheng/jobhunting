@@ -40,10 +40,10 @@ const SYSTEM = `You evaluate a single job posting for one candidate. Return:
 
 const isMock = () => !!process.env.JOBHUNTER_MOCK;
 
-export async function judgeJob(job: JobForJudgment, ctx: JudgeContext): Promise<Judgment> {
-  if (isMock()) return mockJudgment(job);
+export const JUDGE_MODEL = "claude-haiku-4-5-20251001";
 
-  const client = new Anthropic();
+/** Per-job message content (prompt + résumé), shared by the single + batch paths. */
+function buildContent(job: JobForJudgment, ctx: JudgeContext): Anthropic.ContentBlockParam[] {
   const content: Anthropic.ContentBlockParam[] = [
     { type: "text", text: buildPrompt(job, ctx.criteria) },
   ];
@@ -55,12 +55,20 @@ export async function judgeJob(job: JobForJudgment, ctx: JudgeContext): Promise<
       source: { type: "base64", media_type: "application/pdf", data: ctx.resume.data },
     });
   }
+  return content;
+}
 
+const finalize = (j: Judgment): Judgment => ({ ...j, relevance: clamp(Math.round(j.relevance), 1, 5) });
+
+export async function judgeJob(job: JobForJudgment, ctx: JudgeContext): Promise<Judgment> {
+  if (isMock()) return mockJudgment(job);
+
+  const client = new Anthropic();
   const response = await client.messages.parse({
-    model: "claude-haiku-4-5-20251001",
+    model: JUDGE_MODEL,
     max_tokens: 1024,
     system: SYSTEM,
-    messages: [{ role: "user", content }],
+    messages: [{ role: "user", content: buildContent(job, ctx) }],
     output_config: { format: zodOutputFormat(JudgmentSchema) },
   });
 
@@ -68,7 +76,62 @@ export async function judgeJob(job: JobForJudgment, ctx: JudgeContext): Promise<
   if (!parsed) {
     throw new Error(`Judge returned no valid output (stop reason: ${response.stop_reason}).`);
   }
-  return { ...parsed, relevance: clamp(Math.round(parsed.relevance), 1, 5) };
+  return finalize(parsed);
+}
+
+/** Judge many jobs in one Message Batch — 50% cheaper, no rate-limit pacing.
+ *  Returns a map keyed by the caller's job id; jobs whose request errored are
+ *  omitted (so the caller can leave them `new` and retry next run). Falls back to
+ *  the deterministic mock under JOBHUNTER_MOCK. */
+export async function judgeJobsBatch(
+  jobs: Array<JobForJudgment & { id: string }>,
+  ctx: JudgeContext,
+): Promise<Map<string, Judgment>> {
+  const out = new Map<string, Judgment>();
+  if (jobs.length === 0) return out;
+  if (isMock()) {
+    for (const job of jobs) out.set(job.id, mockJudgment(job));
+    return out;
+  }
+
+  const client = new Anthropic();
+  const ids = jobs.map((j) => j.id); // custom_id can't contain ':' — index into this instead
+  const requests = jobs.map((job, i) => ({
+    custom_id: `j${i}`,
+    params: {
+      model: JUDGE_MODEL,
+      max_tokens: 1024,
+      system: SYSTEM,
+      messages: [{ role: "user" as const, content: buildContent(job, ctx) }],
+      output_config: { format: zodOutputFormat(JudgmentSchema) },
+    },
+  }));
+
+  let batch = await client.messages.batches.create({ requests });
+  const deadline = Date.now() + 30 * 60 * 1000;
+  while (batch.processing_status !== "ended") {
+    if (Date.now() > deadline) throw new Error("Judge batch timed out after 30 minutes.");
+    await new Promise((r) => setTimeout(r, 6000));
+    batch = await client.messages.batches.retrieve(batch.id);
+  }
+
+  for await (const r of await client.messages.batches.results(batch.id)) {
+    if (r.result.type !== "succeeded") continue;
+    const id = ids[Number(r.custom_id.slice(1))];
+    const judgment = extractJudgment(r.result.message);
+    if (id && judgment) out.set(id, judgment);
+  }
+  return out;
+}
+
+/** Pull the schema-conforming JSON out of a batch result message. */
+function extractJudgment(msg: Anthropic.Message): Judgment | null {
+  const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+  try {
+    return finalize(JudgmentSchema.parse(JSON.parse(text)));
+  } catch {
+    return null;
+  }
 }
 
 function buildPrompt(job: JobForJudgment, c: Criteria): string {
