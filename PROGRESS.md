@@ -12,6 +12,23 @@ Turso/Google) + `resume.*`, run `configure`, then deploy `ROUTINE.md` via
 **Next action:** none in the build loop. Credentialed happy-paths (real fetch,
 real LLM judgment quality, real Gmail send) are exercised on first deploy.
 
+**LIVE — running for real (2026-06-26).** Credentials in `.env`; `resume.md`
+(text) + `filter.json` configured for US SWE/ML/DS **internships** (title-only,
+7-day window). Hardened against real Adzuna/Anthropic behavior: short `what`
+queries, 403≠broken link check, Haiku for curate, Adzuna pagination (`maxPages`),
+`titleOnly` precision (53%→99% intern-titled). Deployed as a **Claude daily
+routine** ("job-hunter-daily-digest", 4:01 PM, runs the pipeline + emails the
+digest via Gmail). Runs locally while the Claude app is open.
+
+**Open enhancements (offered, not yet built):**
+- **A — Batch curate:** rework `curate.ts`/`judge.ts` to use the Message Batches
+  API (50% cheaper, no rate-limit pacing). Marginal at ~67 jobs/day on Haiku;
+  worth it when volume scales.
+- **B — Direct company links:** add a keyless **Greenhouse/Lever/Ashby**
+  `JobSource` — Adzuna only returns its own `redirect_url` (403s bots; no
+  employer URL field), so company-board sources are the only way to get direct
+  apply links. Recommended next.
+
 **Backlog (non-blocking, from verifiers):** analyze gap uses naive substring
 `includes` (e.g. "Go" suppressed by "good" in résumé) — word-boundary match
 would be cleaner; repair-links greedy JSON regex (safe);
