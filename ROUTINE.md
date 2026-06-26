@@ -43,10 +43,17 @@ Every step only populates/updates the shared DB — nothing is ever deleted.
 > 5. `npm run analyze`
 > 6. `npm run digest` — capture its stdout; that Markdown is the email body.
 >
-> Then send that digest via the connected Gmail to **zp2153@nyu.edu** with the
-> subject `Job digest — <today's date>`. Send the digest output verbatim — do
-> not invent or reword jobs, numbers, or skills. If "Top picks" is empty, still
-> send it: that's a valid "nothing new today" digest.
+> Then deliver that digest to **zp2153@nyu.edu** via the connected Gmail with the
+> subject `Job digest — <today's date>` — use the Gmail **create_draft** tool
+> (this connector drafts rather than sends; if your connector exposes a send
+> tool, send instead). Use the digest output verbatim — do not invent or reword
+> jobs, numbers, or skills. If "Top picks" is empty, still deliver it: that's a
+> valid "nothing new today" digest.
+
+The `digest` Markdown works as the plain body as-is; for a nicer email, render
+the **Top picks** as `<a href>` links and the **Skills** block as a short
+paragraph (see how the 2026-06-26 draft was built — top picks become clickable,
+direct-apply company links get a badge).
 
 ## Notes
 
