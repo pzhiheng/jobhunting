@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -15,13 +16,20 @@ interface RawEmail {
   receivedAt: string;
 }
 
-type EventType = "confirmation" | "oa" | "interview" | "rejection" | "other";
+type EventType = "confirmation" | "oa" | "interview" | "offer" | "rejection" | "other";
 
 const EVENT_STAGE: Partial<Record<EventType, string>> = {
   confirmation: "confirmed",
   oa: "oa",
   interview: "interview",
+  offer: "offer",
   rejection: "rejected",
+};
+
+// Stage order, so a stray late email can't regress a job (e.g. a generic
+// "application received" after you already have an interview). Higher wins.
+const STAGE_RANK: Record<string, number> = {
+  not_applied: 0, applied: 1, confirmed: 2, oa: 3, interview: 4, offer: 5, rejected: 6,
 };
 
 // --- Mock fixture inbox (referencing seeded companies) ---
@@ -104,15 +112,18 @@ async function gmailGet(url: string, token: string): Promise<unknown> {
 // --- Classification: mock keywords or real Claude ---
 
 const ClassificationSchema = z.object({
-  type: z.enum(["confirmation", "oa", "interview", "rejection", "other"]),
+  type: z.enum(["confirmation", "oa", "interview", "offer", "rejection", "other"]),
   company: z.string(),
+  title: z.string(), // the specific role/job title the email is about, or "" if none
 });
 type Classification = z.infer<typeof ClassificationSchema>;
 
 const CLASSIFY_SYSTEM = `Classify a recruiting email about a job application into one of:
 "confirmation" (application received/acknowledged), "oa" (online assessment / coding
-challenge invite), "interview" (interview invitation/scheduling), "rejection"
-(declined / not moving forward), or "other". Also extract the hiring company's name.`;
+challenge invite), "interview" (interview invitation/scheduling), "offer" (a job offer),
+"rejection" (declined / not moving forward), or "other". Also extract the hiring
+company's name, and the specific job title/role the email is about (empty string if
+none is mentioned).`;
 
 async function classify(email: RawEmail, client: Anthropic | null): Promise<Classification> {
   if (isMock() || !client) return mockClassify(email);
@@ -128,14 +139,23 @@ async function classify(email: RawEmail, client: Anthropic | null): Promise<Clas
   return response.parsed_output ?? mockClassify(email);
 }
 
-function mockClassify(email: RawEmail): Classification {
+export function mockClassify(email: RawEmail): Classification {
   const text = `${email.subject} ${email.snippet}`.toLowerCase();
   let type: EventType = "other";
   if (/assessment|coding challenge|\boa\b/.test(text)) type = "oa";
   else if (/interview/.test(text)) type = "interview";
+  else if (/pleased to offer|job offer|congratulations.*offer/.test(text)) type = "offer";
   else if (/unfortunately|not moving forward|regret|declined/.test(text)) type = "rejection";
   else if (/received|thank you for applying|application/.test(text)) type = "confirmation";
-  return { type, company: companyFromSender(email.from) };
+  return { type, company: companyFromSender(email.from), title: titleFromSubject(email.subject) };
+}
+
+/** Heuristic role extraction for the mock path (the real path uses the LLM). */
+function titleFromSubject(subject: string): string {
+  const m = subject.match(
+    /([A-Za-z/ ]*\b(?:engineer|engineering|intern|internship|developer|scientist|analyst|manager|designer)\b[A-Za-z/ ]*)/i,
+  );
+  return m ? m[1].trim() : "";
 }
 
 /** "Acme Corp Talent <x@y>" → "Acme Corp" */
@@ -146,15 +166,38 @@ function companyFromSender(from: string): string {
 
 // --- Matching + persistence ---
 
-async function findJob(db: Client, company: string): Promise<string | null> {
+export function titleOverlap(a: string, b: string): number {
+  const toks = (s: string) => new Set((s.toLowerCase().match(/[a-z]+/g) ?? []).filter((t) => t.length > 2));
+  const A = toks(a);
+  const B = toks(b);
+  let n = 0;
+  for (const t of A) if (B.has(t)) n++;
+  return n;
+}
+
+/** Match an email to a specific job: narrow to the company, then (if multiple
+ *  roles there) pick the one whose title best matches the email's role. */
+export async function findJob(db: Client, company: string, title: string): Promise<string | null> {
   if (!company) return null;
-  const { rows } = await db.execute("SELECT id, company FROM jobs ORDER BY id");
+  const { rows } = await db.execute("SELECT id, company, title FROM jobs ORDER BY id");
   const c = company.toLowerCase();
-  for (const r of rows) {
+  const candidates = rows.filter((r) => {
     const jc = String(r.company ?? "").toLowerCase();
-    if (jc && (jc.includes(c) || c.includes(jc))) return String(r.id);
+    return jc && (jc.includes(c) || c.includes(jc));
+  });
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1 || !title) return String(candidates[0].id);
+
+  let best = candidates[0];
+  let bestScore = -1;
+  for (const r of candidates) {
+    const s = titleOverlap(title, String(r.title ?? ""));
+    if (s > bestScore) {
+      bestScore = s;
+      best = r;
+    }
   }
-  return null;
+  return String(best.id);
 }
 
 async function main() {
@@ -173,7 +216,7 @@ async function main() {
     if (seen.rows.length) { skipped++; continue; }
 
     const c = await classify(email, client);
-    const jobId = await findJob(db, c.company);
+    const jobId = await findJob(db, c.company, c.title);
 
     await db.execute({
       sql: `INSERT INTO app_events (job_id, type, email_id, subject, snippet, received_at)
@@ -187,11 +230,18 @@ async function main() {
 
     const stage = EVENT_STAGE[c.type];
     if (jobId && stage) {
-      await db.execute({
-        sql: "UPDATE jobs SET stage = :stage WHERE id = :id",
-        args: { id: jobId, stage },
-      });
-      advanced++;
+      const cur = (
+        await db.execute({ sql: "SELECT stage FROM jobs WHERE id = :id", args: { id: jobId } })
+      ).rows[0];
+      const curStage = String(cur?.stage ?? "not_applied");
+      // Only move the stage forward (rejection always applies — it's terminal).
+      if ((STAGE_RANK[stage] ?? 0) > (STAGE_RANK[curStage] ?? 0)) {
+        await db.execute({
+          sql: "UPDATE jobs SET stage = :stage WHERE id = :id",
+          args: { id: jobId, stage },
+        });
+        advanced++;
+      }
     }
   }
   db.close();
@@ -202,7 +252,9 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error(err.message ?? err);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err.message ?? err);
+    process.exit(1);
+  });
+}

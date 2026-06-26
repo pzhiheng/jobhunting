@@ -12,6 +12,9 @@ import type { Client } from "@libsql/client";
  * never hard-fails on a missing mailer).
  */
 
+// Where the tracker is reachable (override if you host it; default = local serve).
+const TRACKER_URL = process.env.TRACKER_URL || "http://localhost:3001";
+
 // Mirrors the app's "Top picks" definition (server.ts / digest.ts).
 const TOP_PICKS_WHERE =
   "suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied'";
@@ -65,7 +68,8 @@ async function buildHtml(db: Client): Promise<string> {
   return (
     `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:680px;color:#1a2233">` +
     `<h2 style="margin:0 0 4px">Job digest — ${today}</h2>` +
-    `<p style="color:#5a6b7b;margin:0 0 16px">${c.total} tracked · <b>${c.top} top picks</b> · ${c.suit} suitable · ${c.notsuit} not suitable · ${c.broken} broken link${c.broken === 1 ? "" : "s"}</p>` +
+    `<p style="color:#5a6b7b;margin:0 0 12px">${c.total} tracked · <b>${c.top} top picks</b> · ${c.suit} suitable · ${c.notsuit} not suitable · ${c.broken} broken link${c.broken === 1 ? "" : "s"}</p>` +
+    `<p style="margin:0 0 16px"><a href="${esc(TRACKER_URL)}" style="display:inline-block;background:#1a56db;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:8px 16px;border-radius:6px">Open the tracker →</a></p>` +
     (picks.length
       ? `<h3 style="margin:0 0 8px">Top picks${picks.length < c.top ? ` (${picks.length} of ${c.top})` : ""}</h3><ol style="padding-left:18px;margin:0 0 18px">${items}</ol>`
       : `<p>No new top picks today.</p>`) +
@@ -81,7 +85,7 @@ async function main() {
   const to = process.env.DIGEST_TO || user;
 
   const db = await openDb();
-  const text = await buildDigest(db);
+  const text = (await buildDigest(db)) + `\n\nOpen the tracker: ${TRACKER_URL}`;
   const html = await buildHtml(db);
   db.close();
 
