@@ -38,6 +38,19 @@
     .cmd input { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px; width:200px; }
     .log { background:#0f172a; color:#e2e8f0; border-radius:8px; padding:14px 16px; max-height:420px; overflow:auto; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; word-break:break-word; }
     .log .badge { font-weight:600; } .log .badge.ok { color:#4ade80; } .log .badge.fail { color:#f87171; }
+    .apps { display:flex; flex-direction:column; gap:12px; }
+    .appcard { border:1px solid var(--line); border-radius:8px; padding:12px 16px; background:#fff; }
+    .apphead { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    .timeline { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:10px 0; }
+    .timeline .ev { font-size:12px; line-height:1.3; padding:4px 8px; border:1px solid var(--line); border-radius:6px; background:#f8fafc; }
+    .timeline .arrow { color:var(--muted); }
+    .approw { display:flex; align-items:center; gap:8px; font-size:13px; }
+    .approw select { font:inherit; padding:4px 8px; border:1px solid var(--line); border-radius:6px; }
+    .pill.stage-applied,.pill.stage-confirmed { background:#dbeafe; color:#1e40af; }
+    .pill.stage-oa { background:#fef3c7; color:#92400e; }
+    .pill.stage-interview { background:#e0e7ff; color:#3730a3; }
+    .pill.stage-offer { background:#dcfce7; color:#166534; }
+    .pill.stage-rejected { background:#fee2e2; color:#991b1b; }
   </style>
 </head>
 <body>
@@ -96,6 +109,7 @@
       const el = document.getElementById("content");
       if (active === "run") return renderRun(el);
       if (active === "skills") return renderSkills(el);
+      if (active === "applied") return renderApplied(el);
 
       const jobs = await j(`/api/jobs?section=${active}`);
       if (!jobs.length) { el.innerHTML = `<div class="empty">No jobs here yet.</div>`; return; }
@@ -120,6 +134,38 @@
     function stageSelect(job) {
       const opts = STAGES.map(s => `<option value="${s}" ${s===job.stage?"selected":""}>${s}</option>`).join("");
       return `<select data-id="${esc(job.id)}">${opts}</select>`;
+    }
+
+    const STAGE_LABEL = { not_applied:"Not applied", applied:"Applied", confirmed:"Confirmed", oa:"OA", interview:"Interview", offer:"Offer", rejected:"Rejected" };
+    const EVENT_LABEL = { applied:"Applied", confirmed:"Confirmed", confirmation:"Confirmed", oa:"OA", interview:"Interview", offer:"Offer", rejected:"Rejected", rejection:"Rejected", other:"Update" };
+    function fmtDate(s) {
+      const d = new Date(String(s).replace(" ", "T"));
+      return isNaN(d) ? esc(s) : d.toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" });
+    }
+
+    async function renderApplied(el) {
+      const jobs = await j("/api/applied");
+      if (!jobs.length) {
+        el.innerHTML = `<div class="empty">No applications tracked yet. Set a job's status to "applied" (here or in any tab) and its dated timeline shows up.</div>`;
+        return;
+      }
+      const cards = jobs.map(job => {
+        const events = job.events || [];
+        const timeline = events.length
+          ? events.map(e => `<span class="ev"><b>${esc(EVENT_LABEL[e.type] || e.type)}</b><br><span class="muted">${fmtDate(e.date)}</span></span>`).join('<span class="arrow">→</span>')
+          : `<span class="muted">no dated events yet</span>`;
+        return `<div class="appcard">
+          <div class="apphead">
+            <div>${job.url ? `<a href="${esc(job.url)}" target="_blank" rel="noopener">${esc(job.title)}</a>` : esc(job.title)}
+              <div class="muted">${esc(job.company)}${job.location ? ` · ${esc(job.location)}` : ""}</div></div>
+            <span class="pill stage-${esc(job.stage)}">${esc(STAGE_LABEL[job.stage] || job.stage)}</span>
+          </div>
+          <div class="timeline">${timeline}</div>
+          <div class="approw"><span class="muted">Update status:</span> ${stageSelect(job)}</div>
+        </div>`;
+      }).join("");
+      el.innerHTML = `<div class="apps">${cards}</div>`;
+      el.querySelectorAll("select[data-id]").forEach(sel => sel.onchange = () => setStage(sel.dataset.id, sel.value));
     }
 
     async function renderSkills(el) {

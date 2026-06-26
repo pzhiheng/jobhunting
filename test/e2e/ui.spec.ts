@@ -62,8 +62,8 @@ test("Not suitable tab shows unsuitable jobs", async ({ page }) => {
 test("Applied tab shows jobs with a non-default stage", async ({ page }) => {
   await page.goto("/");
   await page.locator("nav button", { hasText: "Applied" }).click();
-  const rows = page.locator("table tbody tr");
-  await expect(rows).toHaveCount(FIXTURE_COUNTS.applied);
+  const cards = page.locator(".appcard");
+  await expect(cards).toHaveCount(FIXTURE_COUNTS.applied);
 });
 
 // ---------------------------------------------------------------------------

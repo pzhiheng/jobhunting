@@ -101,7 +101,37 @@ export function createApp(db: Client): Express {
       res.status(404).json({ error: "job not found" });
       return;
     }
+    // Record a dated event for the pipeline timeline (so manual stage changes are
+    // timestamped even without the email poller). Skip reverting to not_applied.
+    if (stage !== "not_applied") {
+      await db.execute({
+        sql: "INSERT INTO app_events (job_id, type, received_at) VALUES (:id, :stage, datetime('now'))",
+        args: { id: req.params.id, stage },
+      });
+    }
     res.json({ id: req.params.id, stage });
+  });
+
+  // Applied pipeline: each non-not_applied job with its dated stage-event timeline.
+  app.get("/api/applied", async (_req, res) => {
+    const jobs = (
+      await db.execute(
+        `SELECT id, title, company, location, url, stage FROM jobs
+         WHERE stage <> 'not_applied' ORDER BY company`,
+      )
+    ).rows;
+    const events = (
+      await db.execute(
+        `SELECT job_id, type, COALESCE(received_at, created_at) AS date FROM app_events
+         WHERE job_id IN (SELECT id FROM jobs WHERE stage <> 'not_applied')
+         ORDER BY COALESCE(received_at, created_at)`,
+      )
+    ).rows;
+    const byJob: Record<string, { type: string; date: string }[]> = {};
+    for (const e of events) {
+      (byJob[String(e.job_id)] ??= []).push({ type: String(e.type), date: String(e.date ?? "") });
+    }
+    res.json(jobs.map((j) => ({ ...j, events: byJob[String(j.id)] ?? [] })));
   });
 
   // Control panel: the allow-list of runnable pipeline commands.
