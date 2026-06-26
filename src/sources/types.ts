@@ -10,6 +10,7 @@ export interface SearchConfig {
   maxDaysOld: number;
   resultsPerPage: number;
   maxPages: number; // pages of resultsPerPage to fetch per search (1 = first page only)
+  titleOnly: boolean; // match keywords in the job title only (vs title + body)
   searches: Search[];
 }
 

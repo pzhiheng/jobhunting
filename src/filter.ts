@@ -21,6 +21,9 @@ export const ParsedFilterSchema = z.object({
   country: z.string(),
   maxDaysOld: z.number(),
   resultsPerPage: z.number(),
+  // When true, match each search's keywords in the job TITLE only (precise —
+  // e.g. only "…Intern" titles). When false, also match the body (broader, noisier).
+  titleOnly: z.boolean().default(false),
   searches: z.array(SearchSchema),
   criteria: CriteriaSchema,
 });
@@ -45,6 +48,7 @@ export function toSearchConfig(filter: Filter): SearchConfig {
     maxDaysOld: filter.maxDaysOld,
     resultsPerPage: filter.resultsPerPage,
     maxPages: filter.maxPages,
+    titleOnly: filter.titleOnly,
     searches: filter.searches,
   };
 }

@@ -54,11 +54,13 @@ async function runSearch(
       app_id: appId,
       app_key: appKey,
       results_per_page: String(config.resultsPerPage),
-      what: search.what,
-      where: search.where,
       max_days_old: String(config.maxDaysOld),
       "content-type": "application/json",
     });
+    // title_only restricts the keyword match to the posting title (precise);
+    // otherwise `what` matches title + body (broader, noisier).
+    params.set(config.titleOnly ? "title_only" : "what", search.what);
+    if (search.where) params.set("where", search.where);
     const res = await fetch(`${BASE}/${config.country}/search/${page}?${params}`);
     if (res.status === 429) break; // rate-limited — stop paging this search, keep what we have
     if (!res.ok) {

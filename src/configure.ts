@@ -27,8 +27,13 @@ A filter has two halves — produce BOTH:
    dealbreakers[], scoringRubric }. scoringRubric is 1-5 guidance a later step
    uses to score each job's fit.
 
+Set titleOnly=true to match the role keywords in the job TITLE only — strongly
+preferred for precise searches like internships (it keeps out full-time posts
+that merely mention an internship in the body); use false only for a deliberately
+broad search.
+
 Defaults unless the request implies otherwise: country "us", maxDaysOld 2,
-resultsPerPage 50.`;
+resultsPerPage 50, titleOnly true.`;
 
 function readRequest(): string {
   const arg = process.argv.slice(2).join(" ").trim();
