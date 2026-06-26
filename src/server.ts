@@ -30,11 +30,12 @@ const JOB_COLS = `id, title, company, location, remote, url, category,
   salary_min, salary_max, relevance, relevance_notes, suitability,
   suitability_notes, link_status, link_checked_at, stage, status, posted_at`;
 
-// Section → WHERE/ORDER. "top_picks" = suitable, strong relevance, link not dead.
+// Section → WHERE/ORDER. "top_picks" = suitable, strong relevance, link not dead,
+// and NOT yet applied (applied jobs move to the "applied" section).
 const SECTIONS: Record<string, { where: string; order: string }> = {
   all: { where: "1=1", order: "relevance DESC, company" },
   top_picks: {
-    where: "suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired')",
+    where: "suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied'",
     order: "relevance DESC, company",
   },
   not_suitable: { where: "suitability = 'unsuitable'", order: "relevance DESC, company" },

@@ -47,9 +47,10 @@ describe("buildDigest", () => {
     try {
       await seedFixture(db);
       const digest = await buildDigest(db);
-      // seed:1 and seed:4 qualify; seed:3 is suitable but relevance=3+broken.
+      // Only seed:1 qualifies. seed:4 is suitable+rel5 but already applied (excluded);
+      // seed:3 is suitable but relevance=3 + broken link.
       assert.ok(digest.includes("Senior Backend Engineer"), "seed:1 missing");
-      assert.ok(digest.includes("ML Engineer"), "seed:4 missing");
+      assert.equal(digest.includes("ML Engineer"), false, "seed:4 is applied → must be excluded from top picks");
       assert.equal(digest.includes("Full Stack Engineer"), false, "seed:3 should NOT appear in top picks");
     } finally {
       db.close();

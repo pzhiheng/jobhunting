@@ -6,7 +6,7 @@ import type { Client } from "@libsql/client";
 // Mirrors the web app's "Top picks" section (server.ts SECTIONS.top_picks):
 // suitable, strong relevance, link not dead.
 const TOP_PICKS_WHERE =
-  "suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired')";
+  "suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied'";
 
 function fmtSalary(min: unknown, max: unknown): string {
   const k = (n: number) => `$${Math.round(n / 1000)}k`;

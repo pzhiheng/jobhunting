@@ -6,7 +6,8 @@
  *   seed:1  — suitable, relevance 5, link ok      → Top picks + All
  *   seed:2  — unsuitable, relevance 2, link ok     → Not suitable
  *   seed:3  — suitable, relevance 3, link broken   → All (not Top picks — low rel + broken)
- *   seed:4  — suitable, relevance 5, link ok, stage=applied → Applied + Top picks
+ *   seed:4  — suitable, relevance 5, link ok, stage=applied → Applied only
+ *             (excluded from Top picks because it's already applied)
  *
  * Skills: Python (2), TypeScript (1), Go (1), Kubernetes (1)
  * Analysis row: summary + gap
@@ -24,7 +25,7 @@ export interface FixtureCounts {
 
 export const FIXTURE_COUNTS: FixtureCounts = {
   total: 4,
-  top_picks: 2,  // seed:1 and seed:4
+  top_picks: 1,  // seed:1 only (seed:4 is suitable+rel5 but already applied → excluded)
   suitable: 3,
   not_suitable: 1,
   applied: 1,

@@ -14,7 +14,7 @@ import type { Client } from "@libsql/client";
 
 // Mirrors the app's "Top picks" definition (server.ts / digest.ts).
 const TOP_PICKS_WHERE =
-  "suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired')";
+  "suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied'";
 
 const esc = (s: unknown) =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
