@@ -16,7 +16,10 @@
     "analyze": "tsx src/analyze.ts",
     "digest": "tsx src/digest.ts",
     "serve": "tsx src/server.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "tsx --test test/unit/*.test.ts test/integration/*.test.ts test/api/*.test.ts",
+    "test:e2e": "playwright test",
+    "test:all": "npm test && npm run test:e2e"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
@@ -26,6 +29,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.5",
     "tsx": "^4.19.2",

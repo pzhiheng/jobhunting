@@ -9,6 +9,7 @@ export interface SearchConfig {
   country: string;
   maxDaysOld: number;
   resultsPerPage: number;
+  maxPages: number; // pages of resultsPerPage to fetch per search (1 = first page only)
   searches: Search[];
 }
 

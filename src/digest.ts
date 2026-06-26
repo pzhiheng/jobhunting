@@ -55,9 +55,11 @@ export async function buildDigest(db: Client): Promise<string> {
     }
   }
 
-  lines.push("", "## Pipeline", `${c.total} tracked · ${c.topPicks} top picks · ` +
-    `${c.suitable} suitable · ${c.notSuitable} not suitable · ${c.applied} in progress · ` +
-    `${c.broken} broken links`);
+  const pl = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  lines.push("", "## Pipeline",
+    `${c.total} tracked · ${pl(c.topPicks, "top pick")} · ` +
+    `${pl(c.suitable, "suitable")} · ${pl(c.notSuitable, "not suitable")} · ` +
+    `${pl(c.applied, "in progress")} · ${pl(c.broken, "broken link")}`);
 
   // Latest analyst output (skills demand + résumé gap), if any.
   const a = (await db.execute("SELECT content FROM analyses ORDER BY id DESC LIMIT 1")).rows[0];

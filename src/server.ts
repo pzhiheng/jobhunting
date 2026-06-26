@@ -1,7 +1,9 @@
 import "dotenv/config";
-import express from "express";
+import { fileURLToPath } from "node:url";
+import express, { type Express } from "express";
 import { spawn } from "node:child_process";
 import { openDb } from "./db.js";
+import type { Client } from "@libsql/client";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const PUBLIC_DIR = new URL("../public", import.meta.url).pathname;
@@ -39,8 +41,9 @@ const SECTIONS: Record<string, { where: string; order: string }> = {
   applied: { where: "stage <> 'not_applied'", order: "stage, company" },
 };
 
-async function main() {
-  const db = await openDb();
+/** Build the Express app around an open DB client. Exported for tests so the
+ *  real API can be mounted on an ephemeral port without spawning a subprocess. */
+export function createApp(db: Client): Express {
   const app = express();
   app.use(express.json());
 
@@ -147,12 +150,21 @@ async function main() {
 
   app.use(express.static(PUBLIC_DIR));
 
+  return app;
+}
+
+async function main() {
+  const db = await openDb();
+  const app = createApp(db);
   app.listen(PORT, "127.0.0.1", () => {
     console.log(`Job tracker on http://localhost:${PORT}`);
   });
 }
 
-main().catch((err) => {
-  console.error(err.message ?? err);
-  process.exit(1);
-});
+// Only auto-start when run directly (not when imported by tests).
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err.message ?? err);
+    process.exit(1);
+  });
+}

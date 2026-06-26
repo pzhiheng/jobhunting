@@ -33,8 +33,8 @@ records what's done and what's next.
 3. Restart the build loop (it reads `PROGRESS.md` and continues from the last
    committed state — it does NOT redo finished phases):
    ```bash
-   # In Claude Code (terminal), self-paced loop:
-   /loop continue the job-hunter build from PROGRESS.md
+   # In Claude Code (terminal), self-paced loop:/loop continue the job-hunter build from PROGRESS.md
+   
    ```
    Or, for a single increment without the loop, just tell Claude Code:
    > "Continue the job-hunter build from PROGRESS.md — do the next phase."

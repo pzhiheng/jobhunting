@@ -81,7 +81,7 @@ async function main() {
     if (!parsed) {
       throw new Error(`Refine returned no valid filter (stop reason: ${response.stop_reason}).`);
     }
-    updated = { request: instruction, ...parsed };
+    updated = { request: instruction, maxPages: current.maxPages, ...parsed };
   }
 
   writeFileSync(FILTER_PATH, JSON.stringify(updated, null, 2) + "\n");

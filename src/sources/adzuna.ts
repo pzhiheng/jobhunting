@@ -38,30 +38,39 @@ export const adzuna: JobSource = {
   },
 };
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const PAGE_DELAY_MS = 2600; // free tier allows ~25 req/min — pace pagination under it
+
 async function runSearch(
   config: SearchConfig,
   search: Search,
   appId: string,
   appKey: string,
 ): Promise<AdzunaResult[]> {
-  const params = new URLSearchParams({
-    app_id: appId,
-    app_key: appKey,
-    results_per_page: String(config.resultsPerPage),
-    what: search.what,
-    where: search.where,
-    max_days_old: String(config.maxDaysOld),
-    "content-type": "application/json",
-  });
-  const url = `${BASE}/${config.country}/search/1?${params}`;
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Adzuna ${res.status} for "${search.what}": ${body.slice(0, 200)}`);
+  const all: AdzunaResult[] = [];
+  for (let page = 1; page <= config.maxPages; page++) {
+    if (page > 1) await sleep(PAGE_DELAY_MS);
+    const params = new URLSearchParams({
+      app_id: appId,
+      app_key: appKey,
+      results_per_page: String(config.resultsPerPage),
+      what: search.what,
+      where: search.where,
+      max_days_old: String(config.maxDaysOld),
+      "content-type": "application/json",
+    });
+    const res = await fetch(`${BASE}/${config.country}/search/${page}?${params}`);
+    if (res.status === 429) break; // rate-limited — stop paging this search, keep what we have
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Adzuna ${res.status} for "${search.what}" (page ${page}): ${body.slice(0, 200)}`);
+    }
+    const data = (await res.json()) as { results?: AdzunaResult[] };
+    const results = data.results ?? [];
+    all.push(...results);
+    if (results.length < config.resultsPerPage) break; // reached the last page
   }
-  const data = (await res.json()) as { results?: AdzunaResult[] };
-  return data.results ?? [];
+  return all;
 }
 
 function normalize(r: AdzunaResult, category: string): NormalizedJob {

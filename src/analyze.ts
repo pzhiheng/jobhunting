@@ -32,18 +32,21 @@ export function assertReadOnly(sql: string): string {
 
 async function main() {
   const db = await openDb();
-  const analysis = isMock() ? await mockAnalysis(db) : await realAnalysis(db);
+  try {
+    const analysis = isMock() ? await mockAnalysis(db) : await realAnalysis(db);
 
-  await db.execute({
-    sql: "INSERT INTO analyses (kind, content) VALUES ('skills', :content)",
-    args: { content: JSON.stringify(analysis) },
-  });
-  db.close();
+    await db.execute({
+      sql: "INSERT INTO analyses (kind, content) VALUES ('skills', :content)",
+      args: { content: JSON.stringify(analysis) },
+    });
 
-  console.log(
-    `Analysis stored: ${analysis.totalJobs} jobs, ${analysis.suitableJobs} suitable, ` +
-      `top skill "${analysis.topSkills[0]?.skill ?? "–"}", ${analysis.gap.length} to learn.`,
-  );
+    console.log(
+      `Analysis stored: ${analysis.totalJobs} jobs, ${analysis.suitableJobs} suitable, ` +
+        `top skill "${analysis.topSkills[0]?.skill ?? "–"}", ${analysis.gap.length} to learn.`,
+    );
+  } finally {
+    db.close();
+  }
 }
 
 // --- Deterministic mock: aggregate directly ---

@@ -134,3 +134,22 @@ npm run serve                       # browse the mock data
 | `npm run poll` | Gmail → advance application stages |
 | `npm run refine "<instruction>"` | adjust the filter from plain language |
 | `npx tsc --noEmit` | typecheck |
+| `npm test` | unit + integration + API tests (~0.6 s, no credentials) |
+| `npm run test:e2e` | Playwright browser E2E (14 tests, ~5 s; needs Chromium) |
+| `npm run test:all` | both suites in sequence |
+
+## Running tests
+
+Tests use isolated in-memory databases and never touch `jobs.db`, `.env`,
+or make real network or LLM calls.
+
+```bash
+npm test              # fastest — node:test runner, no browser
+npm run test:e2e      # headless Chromium — boots an in-memory fixture server
+npm run test:all      # both back to back
+```
+
+To install the Playwright browser on a fresh checkout:
+```bash
+npx playwright install chromium
+```

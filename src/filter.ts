@@ -28,6 +28,9 @@ export const ParsedFilterSchema = z.object({
 /** The full persisted filter — parsed parts plus the raw request that produced them. */
 export const FilterSchema = ParsedFilterSchema.extend({
   request: z.string(),
+  // Pages of `resultsPerPage` to pull per search. 1 = first page only (daily
+  // default). Bump it (e.g. hand-edit filter.json) for a one-time wide sweep.
+  maxPages: z.number().default(1),
 });
 
 export type Search = z.infer<typeof SearchSchema>;
@@ -41,6 +44,7 @@ export function toSearchConfig(filter: Filter): SearchConfig {
     country: filter.country,
     maxDaysOld: filter.maxDaysOld,
     resultsPerPage: filter.resultsPerPage,
+    maxPages: filter.maxPages,
     searches: filter.searches,
   };
 }

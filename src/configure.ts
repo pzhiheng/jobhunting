@@ -12,10 +12,17 @@ const SYSTEM = `You convert a job seeker's natural-language request into a struc
 A filter has two halves — produce BOTH:
 1. searches[]: API-executable queries for the Adzuna job board. Each is
    { category, what, where }. "category" is a short tag you choose (e.g. "swe",
-   "mle"). "what" is title/keywords the board matches; "where" is a location
-   string ("United States", "New York", "Remote"). Produce 2-6 searches that
-   together cover the request — split distinct roles/locations into separate
-   searches.
+   "mle").
+   - "what" = SHORT job-title keywords only (2-3 words, e.g. "software engineer",
+     "machine learning engineer", "backend developer"). The board requires EVERY
+     word in "what" to appear in a posting, so longer phrases match almost
+     nothing. Do NOT put seniority ("entry level", "junior", "new grad"), skills,
+     or "remote" in "what" — those belong in criteria.
+   - "where" = a US city or state ("New York", "California"), or an EMPTY string
+     "" for nationwide. Never use a country name ("United States") or a work-type
+     ("Remote") as "where" — those match nothing.
+   Produce 2-6 searches that together cover the request — split distinct role
+   types into separate searches; vary "what" by role, not by seniority.
 2. criteria: judgment the API can't express — { seniority (or null), mustHaves[],
    dealbreakers[], scoringRubric }. scoringRubric is 1-5 guidance a later step
    uses to score each job's fit.

@@ -26,11 +26,22 @@ npm run fetch                     # run sources per filter.json → upsert into 
 
 npx tsc --noEmit                  # typecheck (no emit)
 npm run build                     # tsc → dist/
+
+npm test                          # unit + integration + API tests (node:test via tsx, ~0.6s)
+npm run test:e2e                  # Playwright browser E2E (14 tests, ~5s; requires chromium)
+npm run test:all                  # both suites in sequence
 ```
 
-There is **no test runner configured yet**. Verification is currently: `npx tsc
---noEmit`, the missing-credential error paths, and a manual schema/fetch smoke
-(see Phase 1 notes in `PROGRESS.md`). Don't invent a `npm test`.
+**Test layout** (`test/`):
+- `unit/` — pure logic (assertReadOnly, filter/toSearchConfig, mock judgment, adzuna normalize)
+- `integration/` — in-memory libSQL (upsertJob dedup/refresh, buildDigest, curate mock loop)
+- `api/` — real Express app on port 0 (all endpoints, stage 200/400/404, /api/run allow-list)
+- `e2e/` — Playwright headless Chromium (tabs, stage select, Run command, skills panel)
+- `helpers/` — `tmpdb.ts` (in-memory isolated DB), `fixture.ts` (deterministic offline dataset)
+
+Tests use isolated in-memory DBs (`openDb(":memory:")`). They never touch `jobs.db`,
+`.env`, or make network/LLM calls. The Playwright `webServer` boots `fixture-server.ts`
+(in-memory DB + fixture) on port 3333 — no real server process needed for other suites.
 
 ## Environment (`.env`, see `.env.example`)
 
@@ -94,7 +105,7 @@ load-bearing — read them before continuing the build:
   Tester/Debugger), and the phased build order with per-phase success criteria.
 - **`PROGRESS.md`** — source of truth for which phase is active and its checklist.
   Update it at every checkpoint; one git commit per phase.
-- **`RESUME.md`** — how to resume a paused build.
+- **`RESUMING.md`** — how to resume a paused build.
 - **`VERIFY.md`** (when present) — the latest independent verifier verdict.
 
 Convention: each phase ends with a commit + `PROGRESS.md` update, then an

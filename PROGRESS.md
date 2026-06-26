@@ -1,11 +1,12 @@
 # Build progress
 
 Source of truth for where the build is. Updated at every phase checkpoint.
-See `RESUME.md` for how to resume a paused build, and the approved plan at
+See `RESUMING.md` for how to resume a paused build, and the approved plan at
 `~/.claude/plans/snappy-foraging-stonebraker.md` for full detail.
 
 **Current phase:** ✅ Build complete — all 6 phases implemented and independently
-verified. Remaining work is a **user action**: populate `.env` (Anthropic/Adzuna/
+verified. Testing + debugging phase added (see Phase 7 below).
+Remaining work is a **user action**: populate `.env` (Anthropic/Adzuna/
 Turso/Google) + `resume.*`, run `configure`, then deploy `ROUTINE.md` via
 `/schedule` with the Gmail connector.
 **Next action:** none in the build loop. Credentialed happy-paths (real fetch,
@@ -13,15 +14,10 @@ real LLM judgment quality, real Gmail send) are exercised on first deploy.
 
 **Backlog (non-blocking, from verifiers):** analyze gap uses naive substring
 `includes` (e.g. "Go" suppressed by "good" in résumé) — word-boundary match
-would be cleaner; analyze `db.close()` only on happy path (no try/finally,
-harmless on exit); repair-links greedy JSON regex (safe);
+would be cleaner; repair-links greedy JSON regex (safe);
 app_events email_id no UNIQUE + non-atomic check-insert (fine for serial CLI);
-findJob bidirectional substring could mis-match short company names; digest
-counts line has no singular form ("1 top picks"). Revisit with real credentials.
-
-**Backlog (non-blocking, from verifiers):** repair-links real path uses a greedy
-JSON regex (safe failure mode); mock relevance is uniform (cosmetic). Address
-when wiring real credentials.
+findJob bidirectional substring could mis-match short company names.
+Fixed: `analyze` db.close() now in `finally`; digest plural ("1 top pick").
 
 ---
 
@@ -116,6 +112,22 @@ when wiring real credentials.
   - ⏳ Real `/schedule` deploy + Gmail send is a **user action** (needs creds +
         Gmail connector) — pipeline + digest verified; the send is deferred,
         consistent with prior phases' credentialed happy-paths.
+
+- [x] **Phase 7 — Testing + debugging** (end-to-end frontend/backend, automated test suite)
+  - [x] `src/db.ts`: `openDb(overrideUrl?)` — optional arg for test isolation; default behaviour unchanged
+  - [x] `src/server.ts`: exported `createApp(db)` so tests mount the real app on port 0 without spawning a subprocess; `main()` guards with `process.argv[1]` check
+  - [x] `test/helpers/tmpdb.ts`: `openTestDb()` / `withTestDb()` — fresh in-memory DB per test
+  - [x] `test/helpers/fixture.ts`: deterministic offline dataset (4 jobs, skills, analyses row); `FIXTURE_COUNTS` for cross-suite assertions
+  - [x] `test/unit/`: assertReadOnly (13), filter+toSearchConfig (9), judge mock (5), adzuna normalize (8) — 35 tests
+  - [x] `test/integration/`: upsertJob (8), buildDigest (8), curate mock loop (6) — 22 tests
+  - [x] `test/api/server.test.ts`: all endpoints, stage 200/400/404, /api/run allow-list, static serving — 30 tests
+  - [x] `test/e2e/fixture-server.ts`: standalone server for Playwright (in-memory DB + fixture)
+  - [x] `test/e2e/ui.spec.ts`: 14 Playwright tests (title, summary, tabs, stage change, Skills panel, Run tab + command execution)
+  - [x] `playwright.config.ts`: Chromium headless, webServer = fixture-server on port 3333
+  - [x] `package.json`: `test`, `test:e2e`, `test:all` scripts; `@playwright/test` devDep
+  - [x] Bug fixes: `analyze.ts` `db.close()` now in `finally`; `digest.ts` singular/plural counts ("1 top pick")
+  - [x] Debug pass: full mock chain (`seed → check-links → curate → repair-links → analyze → digest`) + live server verified against every endpoint; all exit 0
+  - Self-smoke ✅: `npx tsc --noEmit` clean; `npm test` 87/87 pass (~0.6 s); `npm run test:e2e` 14/14 pass (~5 s); `npm run test:all` 101/101 pass
 
 ---
 

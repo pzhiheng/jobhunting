@@ -57,7 +57,7 @@ export async function judgeJob(job: JobForJudgment, ctx: JudgeContext): Promise<
   }
 
   const response = await client.messages.parse({
-    model: "claude-sonnet-4-6",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 1024,
     system: SYSTEM,
     messages: [{ role: "user", content }],

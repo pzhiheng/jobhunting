@@ -2,15 +2,19 @@ import { createClient, type Client } from "@libsql/client";
 import type { NormalizedJob } from "./sources/types.js";
 
 /**
- * Open the shared database. Uses hosted libSQL (Turso) when TURSO_DATABASE_URL
- * is set; otherwise falls back to a local file so the pipeline is runnable in
- * dev without cloud credentials. Both paths use the same client + schema.
+ * Open the shared database. When `overrideUrl` is given (used by tests for an
+ * isolated in-memory/temp DB) it wins. Otherwise uses hosted libSQL (Turso)
+ * when TURSO_DATABASE_URL is set; otherwise falls back to a local file so the
+ * pipeline is runnable in dev without cloud credentials. All paths use the same
+ * client + schema.
  */
-export async function openDb(): Promise<Client> {
-  const url = process.env.TURSO_DATABASE_URL;
-  const client = url
-    ? createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN })
-    : createClient({ url: "file:jobs.db" });
+export async function openDb(overrideUrl?: string): Promise<Client> {
+  const envUrl = process.env.TURSO_DATABASE_URL;
+  const client = overrideUrl
+    ? createClient({ url: overrideUrl })
+    : envUrl
+      ? createClient({ url: envUrl, authToken: process.env.TURSO_AUTH_TOKEN })
+      : createClient({ url: "file:jobs.db" });
 
   await client.executeMultiple(SCHEMA);
   return client;
