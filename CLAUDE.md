@@ -79,8 +79,10 @@ the DB is libSQL/Turso (a shared client), not an in-process file by default.
   `stage`, `status`), plus `job_skills`, `app_events`, `analyses`, and a
   `skill_demand` view. `upsertJob()` dedups on `jobs.id` (`source:external_id`).
 - **`sources/`** — pluggable `JobSource` interface consuming a `SearchConfig`.
-  `adzuna.ts` is the only source today; company career boards
-  (Greenhouse/Lever/Ashby) are planned as additional sources.
+  Two sources: `adzuna.ts` (keyword search across boards; returns an Adzuna
+  redirect URL) and `companyBoards.ts` (keyless Greenhouse/Lever/Ashby boards for
+  the companies in `companies.json` → **direct employer apply URLs**; keeps only
+  titles matching the filter's intent via `makeKeepFilter`).
 - **`fetch.ts`** — loads + validates `filter.json`, runs every source, upserts.
   Per-source `try/catch` so one source failing doesn't abort the run.
 

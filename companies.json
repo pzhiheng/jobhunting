@@ -1,0 +1,28 @@
+{
+  "_comment": "Company career boards (keyless public APIs) → direct apply links. Edit freely: add the board token (the slug in the board URL) under its ATS. Greenhouse: boards-api.greenhouse.io/v1/boards/<token>. Lever: api.lever.co/v0/postings/<token>. Ashby: jobs.ashbyhq.com/<token>.",
+  "greenhouse": [
+    "stripe",
+    "databricks",
+    "cloudflare",
+    "coinbase",
+    "instacart",
+    "airbnb",
+    "lyft",
+    "pinterest",
+    "affirm",
+    "robinhood",
+    "brex",
+    "asana",
+    "datadog",
+    "sofi"
+  ],
+  "lever": [
+    "palantir"
+  ],
+  "ashby": [
+    "ramp",
+    "notion",
+    "vanta",
+    "openai"
+  ]
+}

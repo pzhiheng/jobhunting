@@ -2,10 +2,11 @@ import "dotenv/config";
 import { readFileSync } from "node:fs";
 import { openDb, upsertJob } from "./db.js";
 import { adzuna } from "./sources/adzuna.js";
+import { companyBoards } from "./sources/companyBoards.js";
 import { FilterSchema, toSearchConfig } from "./filter.js";
 import type { JobSource } from "./sources/types.js";
 
-const SOURCES: JobSource[] = [adzuna];
+const SOURCES: JobSource[] = [adzuna, companyBoards];
 const FILTER_PATH = new URL("../filter.json", import.meta.url).pathname;
 
 function loadFilter() {
