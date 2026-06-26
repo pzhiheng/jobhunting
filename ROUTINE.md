@@ -41,19 +41,16 @@ Every step only populates/updates the shared DB — nothing is ever deleted.
 > 3. `npm run curate`
 > 4. `npm run repair-links`
 > 5. `npm run analyze`
-> 6. `npm run digest` — capture its stdout; that Markdown is the email body.
+> 6. `npm run send-digest` — emails the digest (clickable apply links + skills)
+>    to `DIGEST_TO` via SMTP. Report the recipient + messageId it prints.
 >
-> Then deliver that digest to **zp2153@nyu.edu** via the connected Gmail with the
-> subject `Job digest — <today's date>` — use the Gmail **create_draft** tool
-> (this connector drafts rather than sends; if your connector exposes a send
-> tool, send instead). Use the digest output verbatim — do not invent or reword
-> jobs, numbers, or skills. If "Top picks" is empty, still deliver it: that's a
-> valid "nothing new today" digest.
+> If any step fails, stop and report which one and its error.
 
-The `digest` Markdown works as the plain body as-is; for a nicer email, render
-the **Top picks** as `<a href>` links and the **Skills** block as a short
-paragraph (see how the 2026-06-26 draft was built — top picks become clickable,
-direct-apply company links get a badge).
+`send-digest` delivers the digest **into the inbox** (no connector, no drafts) —
+it needs `SMTP_USER` / `SMTP_PASS` (Gmail App Password) and `DIGEST_TO` in `.env`.
+Without those it prints the digest instead of sending, so the routine never
+hard-fails on a missing mailer. (The Gmail *connector* can only `create_draft`,
+which is why sending goes through SMTP instead.)
 
 ## Notes
 
