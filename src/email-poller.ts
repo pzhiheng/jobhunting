@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { fileURLToPath } from "node:url";
+import { ImapFlow } from "imapflow";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -48,17 +49,66 @@ const MOCK_INBOX: RawEmail[] = [
     snippet: "Unfortunately we will not be moving forward at this time.", receivedAt: "2026-06-22T12:00:00Z" },
 ];
 
-// --- Email fetching: mock fixture or real Gmail REST ---
+// --- Email fetching: mock fixture, IMAP (app password), or Gmail OAuth REST ---
 
 async function fetchEmails(): Promise<RawEmail[]> {
   if (isMock()) return MOCK_INBOX;
+  // Prefer IMAP with an app password (simplest — reuses the SMTP creds); fall
+  // back to the Gmail OAuth REST path if only GOOGLE_* is configured.
+  if (process.env.IMAP_USER || process.env.SMTP_USER) return fetchViaImap();
+  if (process.env.GOOGLE_CLIENT_ID) return fetchViaGmailOAuth();
+  throw new Error(
+    "No inbox configured. Set IMAP_USER/IMAP_PASS (or SMTP_USER/SMTP_PASS for IMAP via " +
+      "app password), or GOOGLE_* for OAuth — or set JOBHUNTER_MOCK to use the fixture inbox.",
+  );
+}
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+/** Read recent inbox messages over IMAP using an app password (no OAuth). */
+async function fetchViaImap(): Promise<RawEmail[]> {
+  const user = process.env.IMAP_USER || process.env.SMTP_USER;
+  const pass = process.env.IMAP_PASS || process.env.SMTP_PASS;
+  if (!user || !pass) {
+    throw new Error("Missing IMAP_USER/IMAP_PASS (or SMTP_USER/SMTP_PASS) in .env for the IMAP reader.");
+  }
+  const client = new ImapFlow({
+    host: process.env.IMAP_HOST || "imap.gmail.com",
+    port: Number(process.env.IMAP_PORT || 993),
+    secure: true,
+    auth: { user, pass },
+    logger: false,
+  });
+
+  const emails: RawEmail[] = [];
+  await client.connect();
+  const lock = await client.getMailboxLock("INBOX");
+  try {
+    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    for await (const msg of client.fetch({ since }, { envelope: true, uid: true })) {
+      const env = msg.envelope;
+      if (!env) continue;
+      const a = env.from?.[0];
+      emails.push({
+        id: env.messageId || `imap-uid:${msg.uid}`,
+        from: a ? `${a.name ?? ""} <${a.address ?? ""}>`.trim() : "",
+        subject: env.subject ?? "",
+        snippet: "",
+        receivedAt: env.date instanceof Date ? env.date.toISOString() : new Date().toISOString(),
+      });
+    }
+  } finally {
+    lock.release();
+    await client.logout();
+  }
+  return emails;
+}
+
+async function fetchViaGmailOAuth(): Promise<RawEmail[]> {
+  const clientId = process.env.GOOGLE_CLIENT_ID!;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-  if (!clientId || !clientSecret || !refreshToken) {
+  if (!clientSecret || !refreshToken) {
     throw new Error(
-      "Missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN in .env (or set JOBHUNTER_MOCK).",
+      "Missing GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN in .env for the Gmail OAuth reader.",
     );
   }
 

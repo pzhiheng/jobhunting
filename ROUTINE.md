@@ -40,9 +40,9 @@ Every step only populates/updates the shared DB — nothing is ever deleted.
 > 2. `npm run check-links`
 > 3. `npm run curate`
 > 4. `npm run repair-links`
-> 5. `npm run poll` — read the inbox to mark jobs already applied to (so they
->    drop out of Top picks). **Best-effort:** if it fails on missing Gmail OAuth
->    (`GOOGLE_*` not set), note it and continue to the next step.
+> 5. `npm run poll` — read the inbox (IMAP via the app password, or Gmail OAuth)
+>    to mark jobs already applied to / advanced (so they drop out of Top picks).
+>    **Best-effort:** if no inbox is configured, note it and continue.
 > 6. `npm run analyze`
 > 7. `npm run send-digest` — emails the digest (clickable apply links + skills)
 >    to `DIGEST_TO` via SMTP. Report the recipient + messageId it prints.
