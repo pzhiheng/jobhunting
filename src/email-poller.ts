@@ -78,25 +78,46 @@ async function fetchViaImap(): Promise<RawEmail[]> {
     logger: false,
   });
 
+  const days = Number(process.env.POLL_DAYS || 30);
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const me = user.toLowerCase();
   const emails: RawEmail[] = [];
+  const seen = new Set<string>();
+
   await client.connect();
-  const lock = await client.getMailboxLock("INBOX");
   try {
-    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-    for await (const msg of client.fetch({ since }, { envelope: true, uid: true })) {
-      const env = msg.envelope;
-      if (!env) continue;
-      const a = env.from?.[0];
-      emails.push({
-        id: env.messageId || `imap-uid:${msg.uid}`,
-        from: a ? `${a.name ?? ""} <${a.address ?? ""}>`.trim() : "",
-        subject: env.subject ?? "",
-        snippet: "",
-        receivedAt: env.date instanceof Date ? env.date.toISOString() : new Date().toISOString(),
-      });
+    // All Mail covers inbox + archived; Trash catches deleted application mail
+    // (Gmail keeps it 30 days); Inbox is a fallback for non-Gmail servers. Dedup
+    // by message-id; skip our own sent mail.
+    for (const folder of ["[Gmail]/All Mail", "[Gmail]/Trash", "INBOX"]) {
+      let lock;
+      try {
+        lock = await client.getMailboxLock(folder);
+      } catch {
+        continue; // folder doesn't exist on this server — skip it
+      }
+      try {
+        for await (const msg of client.fetch({ since }, { envelope: true, uid: true })) {
+          const env = msg.envelope;
+          if (!env) continue;
+          const a = env.from?.[0];
+          if ((a?.address ?? "").toLowerCase() === me) continue;
+          const id = env.messageId || `imap-uid:${folder}:${msg.uid}`;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          emails.push({
+            id,
+            from: a ? `${a.name ?? ""} <${a.address ?? ""}>`.trim() : "",
+            subject: env.subject ?? "",
+            snippet: "",
+            receivedAt: env.date instanceof Date ? env.date.toISOString() : new Date().toISOString(),
+          });
+        }
+      } finally {
+        lock.release();
+      }
     }
   } finally {
-    lock.release();
     await client.logout();
   }
   return emails;
@@ -178,7 +199,7 @@ none is mentioned).`;
 async function classify(email: RawEmail, client: Anthropic | null): Promise<Classification> {
   if (isMock() || !client) return mockClassify(email);
   const response = await client.messages.parse({
-    model: "claude-sonnet-4-6",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 256,
     system: CLASSIFY_SYSTEM,
     messages: [
@@ -250,6 +271,21 @@ export async function findJob(db: Client, company: string, title: string): Promi
   return String(best.id);
 }
 
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40);
+
+/** Create a tracked job row from an application email that matched no fetched
+ *  job. The id is deterministic from company+title, so later emails about the
+ *  same application reuse it (INSERT OR IGNORE) and advance its stage. */
+export async function createJobFromEmail(db: Client, c: Classification): Promise<string> {
+  const id = `email:${slug(c.company)}${c.title ? "-" + slug(c.title) : ""}`;
+  await db.execute({
+    sql: `INSERT OR IGNORE INTO jobs (id, source, external_id, title, company, fetched_at, status, stage, suitability)
+          VALUES (:id, 'email', :id, :title, :company, datetime('now'), 'reviewed', 'not_applied', 'unreviewed')`,
+    args: { id, title: c.title || `${c.company} application`, company: c.company },
+  });
+  return id;
+}
+
 async function main() {
   const db = await openDb();
   const client = isMock() ? null : new Anthropic();
@@ -257,6 +293,7 @@ async function main() {
 
   let recorded = 0;
   let advanced = 0;
+  let created = 0;
   let skipped = 0;
   for (const email of emails) {
     const seen = await db.execute({
@@ -266,7 +303,16 @@ async function main() {
     if (seen.rows.length) { skipped++; continue; }
 
     const c = await classify(email, client);
-    const jobId = await findJob(db, c.company, c.title);
+    const stage = EVENT_STAGE[c.type];
+    let jobId = await findJob(db, c.company, c.title);
+
+    // A real application email with no matching job → create a tracked entry from
+    // the email (source 'email'), so applications to jobs we never fetched aren't
+    // lost. Non-application mail (type 'other') creates nothing.
+    if (!jobId && stage && c.company) {
+      jobId = await createJobFromEmail(db, c);
+      created++;
+    }
 
     await db.execute({
       sql: `INSERT INTO app_events (job_id, type, email_id, subject, snippet, received_at)
@@ -278,7 +324,6 @@ async function main() {
     });
     recorded++;
 
-    const stage = EVENT_STAGE[c.type];
     if (jobId && stage) {
       const cur = (
         await db.execute({ sql: "SELECT stage FROM jobs WHERE id = :id", args: { id: jobId } })
@@ -297,8 +342,8 @@ async function main() {
   db.close();
 
   console.log(
-    `Polled ${emails.length} email(s): ${recorded} new event(s), ` +
-      `${advanced} stage advance(s), ${skipped} already seen.`,
+    `Polled ${emails.length} email(s): ${recorded} new event(s), ${created} new application(s) ` +
+      `tracked from email, ${advanced} stage advance(s), ${skipped} already seen.`,
   );
 }
 

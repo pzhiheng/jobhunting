@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { openTestDb } from "../helpers/tmpdb.js";
-import { findJob, titleOverlap, mockClassify } from "../../src/email-poller.js";
+import { findJob, titleOverlap, mockClassify, createJobFromEmail } from "../../src/email-poller.js";
 
 test("titleOverlap counts shared significant tokens", () => {
   assert.ok(titleOverlap("Software Engineer Intern", "Software Engineering Intern") >= 2);
@@ -43,6 +43,25 @@ test("findJob picks the specific role at a company by title", async () => {
     assert.equal(await findJob(db, "Stripe", "Data Science Intern"), "j:1");
     // No company match → null.
     assert.equal(await findJob(db, "Nonexistent Inc", "anything"), null);
+  } finally {
+    db.close();
+  }
+});
+
+test("createJobFromEmail tracks an unmatched application and is reused by later emails", async () => {
+  const db = await openTestDb();
+  try {
+    const c = { type: "confirmation" as const, company: "NewCo", title: "Backend Engineer Intern" };
+    const id = await createJobFromEmail(db, c);
+    assert.match(id, /^email:newco/);
+
+    // It now exists and is matchable by a later email about the same application.
+    assert.equal(await findJob(db, "NewCo", "Backend Engineering Internship"), id);
+    // Idempotent — a second email for the same role reuses the same row.
+    assert.equal(await createJobFromEmail(db, c), id);
+
+    const n = Number((await db.execute("SELECT COUNT(*) AS n FROM jobs WHERE source='email'")).rows[0].n);
+    assert.equal(n, 1);
   } finally {
     db.close();
   }
