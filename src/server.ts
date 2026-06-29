@@ -16,6 +16,7 @@ const COMMANDS: { id: string; label: string; script: string; takesArg: boolean }
   { id: "curate", label: "Curate (relevance + suitability)", script: "curate", takesArg: false },
   { id: "repair-links", label: "Repair links", script: "repair-links", takesArg: false },
   { id: "analyze", label: "Analyze skills", script: "analyze", takesArg: false },
+  { id: "blurbs", label: "Company intros", script: "blurbs", takesArg: false },
   { id: "digest", label: "Build digest", script: "digest", takesArg: false },
   { id: "poll", label: "Poll inbox", script: "poll", takesArg: false },
   { id: "configure", label: "Configure search", script: "configure", takesArg: true },
@@ -30,16 +31,23 @@ const JOB_COLS = `id, title, company, location, remote, url, category,
   salary_min, salary_max, relevance, relevance_notes, suitability,
   suitability_notes, link_status, link_checked_at, stage, status, posted_at`;
 
-// Section → WHERE/ORDER. "top_picks" = suitable, strong relevance, link not dead,
+// A job is "available" (still worth listing) unless its posting is gone — but a
+// job you've already applied to is always kept regardless of its link. So this
+// hides only not-applied jobs whose link is dead.
+const AVAILABLE = "(stage <> 'not_applied' OR link_status NOT IN ('broken','expired'))";
+
+// Section → WHERE/ORDER. Lists are sorted newest-posted-first (not by company);
+// Top picks leads with relevance, then recency. Gone postings drop out of every
+// list via AVAILABLE. "top_picks" = suitable, strong relevance, link not dead,
 // and NOT yet applied (applied jobs move to the "applied" section).
 const SECTIONS: Record<string, { where: string; order: string }> = {
-  all: { where: "1=1", order: "relevance DESC, company" },
+  all: { where: AVAILABLE, order: "posted_at DESC" },
   top_picks: {
     where: "suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied'",
-    order: "relevance DESC, company",
+    order: "relevance DESC, posted_at DESC",
   },
-  not_suitable: { where: "suitability = 'unsuitable'", order: "relevance DESC, company" },
-  applied: { where: "stage <> 'not_applied'", order: "stage, company" },
+  not_suitable: { where: `suitability = 'unsuitable' AND ${AVAILABLE}`, order: "posted_at DESC" },
+  applied: { where: "stage <> 'not_applied'", order: "stage, posted_at DESC" },
 };
 
 /** Build the Express app around an open DB client. Exported for tests so the
@@ -66,7 +74,9 @@ export function createApp(db: Client): Express {
     const section = SECTIONS[String(req.query.section ?? "all")] ?? SECTIONS.all;
     const rows = (
       await db.execute(
-        `SELECT ${JOB_COLS} FROM jobs WHERE ${section.where} ORDER BY ${section.order}`,
+        `SELECT ${JOB_COLS}, c.blurb AS company_blurb
+         FROM jobs LEFT JOIN companies c ON c.name = jobs.company
+         WHERE ${section.where} ORDER BY ${section.order}`,
       )
     ).rows;
     res.json(rows);
@@ -116,8 +126,9 @@ export function createApp(db: Client): Express {
   app.get("/api/applied", async (_req, res) => {
     const jobs = (
       await db.execute(
-        `SELECT id, title, company, location, url, stage FROM jobs
-         WHERE stage <> 'not_applied' ORDER BY company`,
+        `SELECT j.id, j.title, j.company, j.location, j.url, j.stage, c.blurb AS company_blurb
+         FROM jobs j LEFT JOIN companies c ON c.name = j.company
+         WHERE j.stage <> 'not_applied' ORDER BY j.posted_at DESC`,
       )
     ).rows;
     const events = (

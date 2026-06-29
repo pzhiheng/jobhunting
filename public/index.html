@@ -26,6 +26,8 @@
     .rel { font-weight:600; }
     select { font:inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; }
     .muted { color:var(--muted); }
+    .blurb { font-size:12px; color:var(--muted); max-width:300px; margin-top:3px; }
+    .posted { white-space:nowrap; color:var(--muted); }
     .empty { padding:32px; text-align:center; color:var(--muted); }
     .panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:16px; }
     .panel p { margin:6px 0 12px; } .panel .pill { margin:2px; }
@@ -117,15 +119,16 @@
         <tr>
           <td>${job.url ? `<a href="${esc(job.url)}" target="_blank" rel="noopener">${esc(job.title)}</a>` : esc(job.title)}
               <div class="muted">${esc(job.location)}</div></td>
-          <td>${esc(job.company)}</td>
+          <td>${esc(job.company)}${job.company_blurb ? `<div class="blurb">${esc(job.company_blurb)}</div>` : ""}</td>
           <td>${esc(job.category)}</td>
+          <td class="posted">${job.posted_at ? fmtDate(job.posted_at) : "–"}</td>
           <td class="rel">${job.relevance ?? "–"}</td>
           <td><span class="pill ${esc(job.suitability)}">${esc(job.suitability)}</span></td>
           <td class="${esc(job.link_status)}">${esc(job.link_status)}</td>
           <td>${stageSelect(job)}</td>
         </tr>`).join("");
       el.innerHTML = `<table><thead><tr>
-        <th>Title</th><th>Company</th><th>Category</th><th>Rel</th>
+        <th>Title</th><th>Company</th><th>Category</th><th>Posted</th><th>Rel</th>
         <th>Suitability</th><th>Link</th><th>Stage</th></tr></thead><tbody>${rows}</tbody></table>`;
       el.querySelectorAll("select[data-id]").forEach(sel =>
         sel.onchange = () => setStage(sel.dataset.id, sel.value));
@@ -157,7 +160,8 @@
         return `<div class="appcard">
           <div class="apphead">
             <div>${job.url ? `<a href="${esc(job.url)}" target="_blank" rel="noopener">${esc(job.title)}</a>` : esc(job.title)}
-              <div class="muted">${esc(job.company)}${job.location ? ` · ${esc(job.location)}` : ""}</div></div>
+              <div class="muted">${esc(job.company)}${job.location ? ` · ${esc(job.location)}` : ""}</div>
+              ${job.company_blurb ? `<div class="blurb">${esc(job.company_blurb)}</div>` : ""}</div>
             <span class="pill stage-${esc(job.stage)}">${esc(STAGE_LABEL[job.stage] || job.stage)}</span>
           </div>
           <div class="timeline">${timeline}</div>

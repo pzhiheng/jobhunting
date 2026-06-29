@@ -76,6 +76,13 @@ const SCHEMA = `
     content    TEXT
   );
 
+  -- One short, cached introduction per company (filled by company-blurbs.ts).
+  CREATE TABLE IF NOT EXISTS companies (
+    name       TEXT PRIMARY KEY,
+    blurb      TEXT,
+    updated_at TEXT
+  );
+
   -- Raw demand counts. The résumé-gap flag is layered on by the analyst (Phase 5).
   CREATE VIEW IF NOT EXISTS skill_demand AS
     SELECT js.skill AS skill, j.category AS category, COUNT(*) AS count

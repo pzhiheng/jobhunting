@@ -34,12 +34,12 @@ test("Top picks tab is active by default", async ({ page }) => {
   await expect(active).toHaveText("Top picks");
 });
 
-test("clicking All tab loads the full job table", async ({ page }) => {
+test("clicking All tab loads the available job table", async ({ page }) => {
   await page.goto("/");
   await page.locator("nav button", { hasText: "All" }).click();
-  // All tab should show all fixture rows (4 jobs → 4 table body rows).
+  // All tab lists only available jobs (seed:3 is not-applied + broken → hidden).
   const rows = page.locator("table tbody tr");
-  await expect(rows).toHaveCount(FIXTURE_COUNTS.total);
+  await expect(rows).toHaveCount(FIXTURE_COUNTS.listed);
 });
 
 test("Top picks tab shows only qualifying jobs", async ({ page }) => {

@@ -37,8 +37,14 @@ async function checkUrl(url: string): Promise<"ok" | "broken"> {
 
 async function main() {
   const db = await openDb();
+  // Check links that have never been checked, AND re-check every not-yet-applied
+  // job each run — so a posting that dies *after* its first check still gets
+  // caught (its link flips to 'broken' and it drops out of the listings).
+  // Applied jobs keep their first result (you've already engaged with them).
   const { rows } = await db.execute(
-    "SELECT id, url FROM jobs WHERE link_status = 'unchecked' AND url IS NOT NULL AND url <> ''",
+    `SELECT id, url FROM jobs
+     WHERE url IS NOT NULL AND url <> ''
+       AND (link_status = 'unchecked' OR stage = 'not_applied')`,
   );
 
   let ok = 0;

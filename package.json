@@ -15,6 +15,7 @@
     "auth-google": "tsx src/auth-google.ts",
     "refine": "tsx src/refine.ts",
     "analyze": "tsx src/analyze.ts",
+    "blurbs": "tsx src/company-blurbs.ts",
     "digest": "tsx src/digest.ts",
     "send-digest": "tsx src/send-digest.ts",
     "serve": "tsx src/server.ts",

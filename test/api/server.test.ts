@@ -73,15 +73,40 @@ describe("GET /api/summary", () => {
 
 // --- /api/jobs ---
 describe("GET /api/jobs", () => {
-  test("?section=all returns all jobs", async () => {
+  test("?section=all returns only available jobs (gone ones hidden)", async () => {
     const { status, body } = await api("/api/jobs?section=all");
     assert.equal(status, 200);
-    assert.equal(body.length, FIXTURE_COUNTS.total);
+    assert.equal(body.length, FIXTURE_COUNTS.listed);
+    // seed:3 is not-applied with a broken link → hidden from the listing.
+    assert.ok(!body.some((j: { id: string }) => j.id === "seed:3"));
+    // seed:4 is applied with a broken-rule exemption → still listed.
+    assert.ok(body.some((j: { id: string }) => j.id === "seed:4"));
   });
 
   test("defaults to all when no section given", async () => {
     const { body } = await api("/api/jobs");
-    assert.equal(body.length, FIXTURE_COUNTS.total);
+    assert.equal(body.length, FIXTURE_COUNTS.listed);
+  });
+
+  test("results carry posted_at and are sorted newest-first", async () => {
+    const { body } = await api("/api/jobs?section=all");
+    for (const j of body) assert.ok("posted_at" in j);
+    for (let i = 1; i < body.length; i++) {
+      assert.ok(
+        String(body[i - 1].posted_at) >= String(body[i].posted_at),
+        `not sorted by posted_at DESC at index ${i}`,
+      );
+    }
+  });
+
+  test("company blurb is joined into the response", async () => {
+    const { body } = await api("/api/jobs?section=all");
+    const acme = body.find((j: { company: string }) => j.company === "Acme Corp");
+    assert.ok(acme, "Acme Corp row missing");
+    assert.equal(acme.company_blurb, "Acme Corp builds distributed backend systems.");
+    // A company with no blurb row joins to null, not undefined.
+    const other = body.find((j: { company: string }) => j.company !== "Acme Corp");
+    assert.equal(other.company_blurb, null);
   });
 
   test("?section=top_picks returns only qualifying rows", async () => {
@@ -108,7 +133,7 @@ describe("GET /api/jobs", () => {
 
   test("unknown section falls back to all", async () => {
     const { body } = await api("/api/jobs?section=nope");
-    assert.equal(body.length, FIXTURE_COUNTS.total);
+    assert.equal(body.length, FIXTURE_COUNTS.listed);
   });
 
   test("jobs include expected fields", async () => {

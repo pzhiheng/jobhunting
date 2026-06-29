@@ -4,11 +4,16 @@
  *
  * Dataset:
  *   seed:1  — suitable, relevance 5, link ok      → Top picks + All
- *   seed:2  — unsuitable, relevance 2, link ok     → Not suitable
- *   seed:3  — suitable, relevance 3, link broken   → All (not Top picks — low rel + broken)
- *   seed:4  — suitable, relevance 5, link ok, stage=applied → Applied only
- *             (excluded from Top picks because it's already applied)
+ *   seed:2  — unsuitable, relevance 2, link ok     → Not suitable + All
+ *   seed:3  — suitable, relevance 3, link broken   → HIDDEN (not-applied + dead link)
+ *   seed:4  — suitable, relevance 5, link ok, stage=applied → Applied + All
+ *             (excluded from Top picks because it's already applied; kept in All
+ *              despite link rules because applied jobs are always retained)
  *
+ * "All" lists only available jobs, so seed:3 (not-applied + broken) drops out →
+ * listed = 3 (seed:1, seed:2, seed:4). total still counts every row (4).
+ *
+ * Companies: a blurb is seeded for "Acme Corp" (seed:1) to test the join.
  * Skills: Python (2), TypeScript (1), Go (1), Kubernetes (1)
  * Analysis row: summary + gap
  */
@@ -16,6 +21,7 @@ import type { Client } from "@libsql/client";
 
 export interface FixtureCounts {
   total: number;
+  listed: number;
   top_picks: number;
   suitable: number;
   not_suitable: number;
@@ -25,6 +31,7 @@ export interface FixtureCounts {
 
 export const FIXTURE_COUNTS: FixtureCounts = {
   total: 4,
+  listed: 3,     // "All" hides seed:3 (not-applied + broken link); seed:1,2,4 remain
   top_picks: 1,  // seed:1 only (seed:4 is suitable+rel5 but already applied → excluded)
   suitable: 3,
   not_suitable: 1,
@@ -106,6 +113,12 @@ export async function seedFixture(db: Client): Promise<void> {
       args: j as Record<string, string | number | null>,
     });
   }
+
+  // Company blurb (only Acme Corp has one — others LEFT JOIN to null)
+  await db.execute({
+    sql: "INSERT INTO companies (name, blurb, updated_at) VALUES (:name, :blurb, :now)",
+    args: { name: "Acme Corp", blurb: "Acme Corp builds distributed backend systems.", now },
+  });
 
   // Skills
   const skills: [string, string][] = [

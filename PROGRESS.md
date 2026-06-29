@@ -152,6 +152,25 @@ Fixed: `analyze` db.close() now in `finally`; digest plural ("1 top pick").
   - [x] Debug pass: full mock chain (`seed → check-links → curate → repair-links → analyze → digest`) + live server verified against every endpoint; all exit 0
   - Self-smoke ✅: `npx tsc --noEmit` clean; `npm test` 87/87 pass (~0.6 s); `npm run test:e2e` 14/14 pass (~5 s); `npm run test:all` 101/101 pass
 
+- [x] **Phase 8 — Tracker UX: date-sort, company intros, availability hiding**
+  - [x] Sort listings by **posting date (newest first)** instead of company name
+        (`server.ts` SECTIONS); Top picks = relevance then recency. `posted_at`
+        was already populated by every source.
+  - [x] **Company intros**: new `companies` table (`db.ts`) + `src/company-blurbs.ts`
+        (`npm run blurbs`, Haiku, `JOBHUNTER_MOCK` aware, cached per company);
+        `server.ts` LEFT JOINs the blurb into `/api/jobs` + `/api/applied`;
+        `public/index.html` shows it under the company name and adds a Posted column.
+  - [x] **Availability hiding** (chosen over hard delete to keep the never-delete
+        invariant): not-applied jobs whose link is gone (`broken`/`expired`) drop
+        out of every listing via the `AVAILABLE` predicate; applied jobs always kept.
+  - [x] `check-links.ts` now **re-checks every not-applied job each run** (was
+        once-only `unchecked`), so postings that die later get caught and hidden.
+  - [x] Tests: fixture gains `listed`(3) + a seeded blurb; api tests cover the
+        hide, the date-sort, and the blurb join; new `company-blurbs.test.ts`;
+        e2e All-tab count → `listed`. Routine docs + scheduled task add `blurbs`.
+  - Self-smoke ✅: `npx tsc --noEmit` clean; `npm test` 99/99 pass; live tracker
+        verified (148 listed + sorted newest-first + 148/148 blurbs; expired job hidden).
+
 ---
 
 ## Build process (per phase)
