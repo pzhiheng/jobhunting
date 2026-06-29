@@ -17,7 +17,31 @@ export async function openDb(overrideUrl?: string): Promise<Client> {
       : createClient({ url: "file:jobs.db" });
 
   await client.executeMultiple(SCHEMA);
+  // Idempotent migration: add the dedup columns + indexes to DBs created before
+  // they existed (CREATE TABLE IF NOT EXISTS won't add columns to an old table).
+  for (const col of ["dedup_key TEXT", "duplicate_of TEXT"]) {
+    try {
+      await client.execute(`ALTER TABLE jobs ADD COLUMN ${col}`);
+    } catch {
+      /* column already exists — fine */
+    }
+  }
+  await client.executeMultiple(`
+    CREATE INDEX IF NOT EXISTS idx_jobs_dedup ON jobs(dedup_key);
+    CREATE INDEX IF NOT EXISTS idx_jobs_dupof ON jobs(duplicate_of);
+  `);
   return client;
+}
+
+const slugify = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/** Canonical fingerprint for cross-source dedup: same company + same title is
+ *  treated as the same posting, regardless of which source reported it or what
+ *  (often noisy) location string it carried. Location is deliberately excluded —
+ *  aggregators like Adzuna emit junk locations for one role, which would defeat a
+ *  city-based key. The `location` arg is accepted (callers pass it) but ignored. */
+export function dedupKey(company: unknown, title: unknown, _location?: unknown): string {
+  return `${slugify(company)}|${slugify(title)}`;
 }
 
 /** Full schema. Columns for later phases (relevance, suitability, link, stage) are
@@ -45,7 +69,9 @@ const SCHEMA = `
     link_status     TEXT NOT NULL DEFAULT 'unchecked',        -- ok|broken|expired|repaired|unchecked
     link_checked_at TEXT,
     stage           TEXT NOT NULL DEFAULT 'not_applied',      -- not_applied|applied|confirmed|oa|interview|offer|rejected
-    status          TEXT NOT NULL DEFAULT 'new'               -- new|reviewed|dismissed
+    status          TEXT NOT NULL DEFAULT 'new',              -- new|reviewed|dismissed
+    dedup_key       TEXT,                                     -- canonical fingerprint (company|title|city)
+    duplicate_of    TEXT                                      -- NULL = canonical; else the id of the kept copy
   );
   CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
   CREATE INDEX IF NOT EXISTS idx_jobs_relevance ON jobs(relevance);
@@ -101,10 +127,10 @@ export async function upsertJob(db: Client, job: NormalizedJob): Promise<boolean
   await db.execute({
     sql: `INSERT INTO jobs (
             id, source, external_id, title, company, location, remote, url,
-            description, salary_min, salary_max, category, posted_at, fetched_at
+            description, salary_min, salary_max, category, posted_at, fetched_at, dedup_key
           ) VALUES (
             :id, :source, :externalId, :title, :company, :location, :remote, :url,
-            :description, :salaryMin, :salaryMax, :category, :postedAt, :fetchedAt
+            :description, :salaryMin, :salaryMax, :category, :postedAt, :fetchedAt, :dedupKey
           )
           ON CONFLICT(id) DO UPDATE SET
             title      = excluded.title,
@@ -113,7 +139,8 @@ export async function upsertJob(db: Client, job: NormalizedJob): Promise<boolean
             url        = excluded.url,
             salary_min = excluded.salary_min,
             salary_max = excluded.salary_max,
-            fetched_at = excluded.fetched_at`,
+            fetched_at = excluded.fetched_at,
+            dedup_key  = excluded.dedup_key`,
     args: {
       id: job.id,
       source: job.source,
@@ -129,6 +156,7 @@ export async function upsertJob(db: Client, job: NormalizedJob): Promise<boolean
       category: job.category,
       postedAt: job.postedAt,
       fetchedAt: new Date().toISOString(),
+      dedupKey: dedupKey(job.company, job.title, job.location),
     },
   });
   return isNew;

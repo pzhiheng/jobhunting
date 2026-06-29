@@ -171,6 +171,27 @@ Fixed: `analyze` db.close() now in `finally`; digest plural ("1 top pick").
   - Self-smoke ✅: `npx tsc --noEmit` clean; `npm test` 99/99 pass; live tracker
         verified (148 listed + sorted newest-first + 148/148 blurbs; expired job hidden).
 
+- [x] **Phase 9 — More sources (Simplify feed) + cross-source dedup**
+  - [x] `src/sources/simplify.ts`: keyless SimplifyJobs/Pitt-CSC daily internship
+        JSON feed → direct apply links; filtered to active US SWE/ML/Data roles,
+        freshest 400/run. Registered in `fetch.ts` SOURCES.
+  - [x] **Cross-source dedup** (`src/dedup.ts`, `npm run dedup`, auto-run at end of
+        `fetch`): `dedupKey = company|title` (location-independent — Adzuna emits
+        junk locations that would otherwise split one role); collapses each group
+        to a canonical row (prefers direct-apply source > engaged > freshest);
+        others get `duplicate_of` and drop out of every listing/count. Hidden, not
+        deleted — invariant preserved. `db.ts` adds `dedup_key` + `duplicate_of`
+        (with an idempotent ALTER migration for existing DBs); `upsertJob` sets the
+        key; `curate` skips duplicates.
+  - [x] `server.ts` + `digest.ts`: `CANONICAL = duplicate_of IS NULL` AND-ed into
+        every section/count. `companies` blurb step unchanged.
+  - [x] Tests: `dedup.test.ts` (collapse, prefer direct link, engaged-wins,
+        idempotent, distinct-title-kept, `pickCanonical`), `simplify.test.ts`
+        (`locationIsUS`, `normalizeSimplify`, `selectEntries`).
+  - Live result ✅: fetch pulled Adzuna 64 + boards 36 + **Simplify 400**;
+        dedup hid 77 copies → **472 canonical** (was 149), 392 top picks with
+        **0 repeated company+title**; `npm test` 108/108, `tsc` clean.
+
 ---
 
 ## Build process (per phase)

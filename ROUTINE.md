@@ -21,7 +21,7 @@ fetch → check-links → curate → blurbs → repair-links → analyze → dig
 
 | Step | Command | Effect |
 |------|---------|--------|
-| 1 | `npm run fetch`        | pull new postings from the job boards → `jobs` |
+| 1 | `npm run fetch`        | pull new postings (Adzuna + company boards + Simplify feed) → `jobs`, then collapse duplicates to one canonical row each |
 | 2 | `npm run check-links`  | HTTP-check each URL (every not-applied job, every run) → `link_status` |
 | 3 | `npm run curate`       | relevance + résumé suitability + skills for new rows |
 | 4 | `npm run blurbs`       | one-line company intro for any new company → `companies` |

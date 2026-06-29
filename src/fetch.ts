@@ -1,12 +1,14 @@
 import "dotenv/config";
 import { readFileSync } from "node:fs";
 import { openDb, upsertJob } from "./db.js";
+import { dedupeJobs } from "./dedup.js";
 import { adzuna } from "./sources/adzuna.js";
 import { companyBoards } from "./sources/companyBoards.js";
+import { simplify } from "./sources/simplify.js";
 import { FilterSchema, toSearchConfig } from "./filter.js";
 import type { JobSource } from "./sources/types.js";
 
-const SOURCES: JobSource[] = [adzuna, companyBoards];
+const SOURCES: JobSource[] = [adzuna, companyBoards, simplify];
 const FILTER_PATH = new URL("../filter.json", import.meta.url).pathname;
 
 function loadFilter() {
@@ -41,12 +43,18 @@ async function main() {
     }
   }
 
+  // Collapse cross-source/within-source duplicates to one canonical row each.
+  const { duplicateGroups, hidden } = await dedupeJobs(db);
+
   const newCount = (
-    await db.execute("SELECT COUNT(*) AS n FROM jobs WHERE status = 'new'")
+    await db.execute("SELECT COUNT(*) AS n FROM jobs WHERE status = 'new' AND duplicate_of IS NULL")
   ).rows[0].n;
   db.close();
 
-  console.log(`\nDone. ${fetched} fetched, ${added} new this run, ${newCount} awaiting review.`);
+  console.log(
+    `\nDone. ${fetched} fetched, ${added} new this run, ${newCount} awaiting review` +
+      ` (deduped ${duplicateGroups} group(s), ${hidden} copy(ies) hidden).`,
+  );
 }
 
 main().catch((err) => {

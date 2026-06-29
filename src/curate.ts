@@ -31,7 +31,7 @@ async function main() {
 
   const db = await openDb();
   const { rows } = await db.execute(
-    "SELECT id, title, company, location, description, category FROM jobs WHERE status = 'new'",
+    "SELECT id, title, company, location, description, category FROM jobs WHERE status = 'new' AND duplicate_of IS NULL",
   );
   const jobs = rows.map((r) => ({
     id: String(r.id),

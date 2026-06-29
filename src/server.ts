@@ -15,6 +15,7 @@ const COMMANDS: { id: string; label: string; script: string; takesArg: boolean }
   { id: "check-links", label: "Check links", script: "check-links", takesArg: false },
   { id: "curate", label: "Curate (relevance + suitability)", script: "curate", takesArg: false },
   { id: "repair-links", label: "Repair links", script: "repair-links", takesArg: false },
+  { id: "dedup", label: "Dedup postings", script: "dedup", takesArg: false },
   { id: "analyze", label: "Analyze skills", script: "analyze", takesArg: false },
   { id: "blurbs", label: "Company intros", script: "blurbs", takesArg: false },
   { id: "digest", label: "Build digest", script: "digest", takesArg: false },
@@ -35,19 +36,21 @@ const JOB_COLS = `id, title, company, location, remote, url, category,
 // job you've already applied to is always kept regardless of its link. So this
 // hides only not-applied jobs whose link is dead.
 const AVAILABLE = "(stage <> 'not_applied' OR link_status NOT IN ('broken','expired'))";
+// Only the canonical copy of a deduped posting is ever listed/counted.
+const CANONICAL = "duplicate_of IS NULL";
 
 // Section → WHERE/ORDER. Lists are sorted newest-posted-first (not by company);
-// Top picks leads with relevance, then recency. Gone postings drop out of every
-// list via AVAILABLE. "top_picks" = suitable, strong relevance, link not dead,
-// and NOT yet applied (applied jobs move to the "applied" section).
+// Top picks leads with relevance, then recency. Gone postings drop out via
+// AVAILABLE; duplicate copies drop out via CANONICAL. "top_picks" = suitable,
+// strong relevance, link not dead, and NOT yet applied.
 const SECTIONS: Record<string, { where: string; order: string }> = {
-  all: { where: AVAILABLE, order: "posted_at DESC" },
+  all: { where: `${CANONICAL} AND ${AVAILABLE}`, order: "posted_at DESC" },
   top_picks: {
-    where: "suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied'",
+    where: `suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied' AND ${CANONICAL}`,
     order: "relevance DESC, posted_at DESC",
   },
-  not_suitable: { where: `suitability = 'unsuitable' AND ${AVAILABLE}`, order: "posted_at DESC" },
-  applied: { where: "stage <> 'not_applied'", order: "stage, posted_at DESC" },
+  not_suitable: { where: `suitability = 'unsuitable' AND ${AVAILABLE} AND ${CANONICAL}`, order: "posted_at DESC" },
+  applied: { where: `stage <> 'not_applied' AND ${CANONICAL}`, order: "stage, posted_at DESC" },
 };
 
 /** Build the Express app around an open DB client. Exported for tests so the
@@ -60,13 +63,13 @@ export function createApp(db: Client): Express {
     const q = async (where: string) =>
       Number((await db.execute(`SELECT COUNT(*) AS n FROM jobs WHERE ${where}`)).rows[0].n);
     res.json({
-      total: await q("1=1"),
+      total: await q(CANONICAL),
       top_picks: await q(SECTIONS.top_picks.where),
-      suitable: await q("suitability = 'suitable'"),
+      suitable: await q(`suitability = 'suitable' AND ${CANONICAL}`),
       not_suitable: await q(SECTIONS.not_suitable.where),
       applied: await q(SECTIONS.applied.where),
-      new: await q("status = 'new'"),
-      broken: await q("link_status IN ('broken','expired')"),
+      new: await q(`status = 'new' AND ${CANONICAL}`),
+      broken: await q(`link_status IN ('broken','expired') AND ${CANONICAL}`),
     });
   });
 
@@ -128,7 +131,7 @@ export function createApp(db: Client): Express {
       await db.execute(
         `SELECT j.id, j.title, j.company, j.location, j.url, j.stage, c.blurb AS company_blurb
          FROM jobs j LEFT JOIN companies c ON c.name = j.company
-         WHERE j.stage <> 'not_applied' ORDER BY j.posted_at DESC`,
+         WHERE j.stage <> 'not_applied' AND j.duplicate_of IS NULL ORDER BY j.posted_at DESC`,
       )
     ).rows;
     const events = (

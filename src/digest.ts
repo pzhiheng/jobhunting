@@ -3,10 +3,12 @@ import { fileURLToPath } from "node:url";
 import { openDb } from "./db.js";
 import type { Client } from "@libsql/client";
 
+// Only the canonical copy of a deduped posting is listed/counted.
+const CANONICAL = "duplicate_of IS NULL";
 // Mirrors the web app's "Top picks" section (server.ts SECTIONS.top_picks):
-// suitable, strong relevance, link not dead.
+// suitable, strong relevance, link not dead, canonical.
 const TOP_PICKS_WHERE =
-  "suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied'";
+  `suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied' AND ${CANONICAL}`;
 
 function fmtSalary(min: unknown, max: unknown): string {
   const k = (n: number) => `$${Math.round(n / 1000)}k`;
@@ -22,12 +24,12 @@ async function counts(db: Client) {
   const q = async (where: string) =>
     Number((await db.execute(`SELECT COUNT(*) AS n FROM jobs WHERE ${where}`)).rows[0].n);
   return {
-    total: await q("1=1"),
+    total: await q(CANONICAL),
     topPicks: await q(TOP_PICKS_WHERE),
-    suitable: await q("suitability = 'suitable'"),
-    notSuitable: await q("suitability = 'unsuitable'"),
-    applied: await q("stage <> 'not_applied'"),
-    broken: await q("link_status IN ('broken','expired')"),
+    suitable: await q(`suitability = 'suitable' AND ${CANONICAL}`),
+    notSuitable: await q(`suitability = 'unsuitable' AND ${CANONICAL}`),
+    applied: await q(`stage <> 'not_applied' AND ${CANONICAL}`),
+    broken: await q(`link_status IN ('broken','expired') AND ${CANONICAL}`),
   };
 }
 

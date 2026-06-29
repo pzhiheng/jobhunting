@@ -77,14 +77,22 @@ the DB is libSQL/Turso (a shared client), not an in-process file by default.
   creates the **entire schema up front** (later phases only populate, never
   migrate): `jobs` (22 cols incl. `relevance`, `suitability`, `link_status`,
   `stage`, `status`), plus `job_skills`, `app_events`, `analyses`, and a
-  `skill_demand` view. `upsertJob()` dedups on `jobs.id` (`source:external_id`).
+  `skill_demand` view. `upsertJob()` dedups on `jobs.id` (`source:external_id`);
+  **cross-source** dedup is a separate pass (`dedup.ts`), see below.
 - **`sources/`** — pluggable `JobSource` interface consuming a `SearchConfig`.
-  Two sources: `adzuna.ts` (keyword search across boards; returns an Adzuna
-  redirect URL) and `companyBoards.ts` (keyless Greenhouse/Lever/Ashby boards for
+  Three sources: `adzuna.ts` (keyword search across boards; returns an Adzuna
+  redirect URL), `companyBoards.ts` (keyless Greenhouse/Lever/Ashby boards for
   the companies in `companies.json` → **direct employer apply URLs**; keeps only
-  titles matching the filter's intent via `makeKeepFilter`).
-- **`fetch.ts`** — loads + validates `filter.json`, runs every source, upserts.
-  Per-source `try/catch` so one source failing doesn't abort the run.
+  titles matching the filter's intent via `makeKeepFilter`), and `simplify.ts`
+  (the keyless SimplifyJobs/Pitt-CSC daily internship JSON feed → direct apply
+  links; filtered to active US SWE/ML/Data roles).
+- **`dedup.ts`** — `dedupeJobs()` collapses postings with the same fingerprint
+  (`dedupKey` = `company|title`, location-independent so aggregator location noise
+  doesn't split a role) to one canonical row; the rest get `duplicate_of` set and
+  drop out of every listing/count (hidden, never deleted). Prefers direct-apply
+  sources + engaged + freshest. Idempotent; runs at the end of every `fetch`.
+- **`fetch.ts`** — loads + validates `filter.json`, runs every source, upserts,
+  then dedups. Per-source `try/catch` so one source failing doesn't abort the run.
 
 ### Non-obvious constraints
 

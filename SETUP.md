@@ -125,10 +125,12 @@ npm run serve                       # browse the mock data
 | Command | What it does |
 |---------|--------------|
 | `npm run configure "<request>"` | NL request → `filter.json` (+ `request.md`) |
-| `npm run fetch` | job-board APIs → DB |
+| `npm run fetch` | job-board APIs (Adzuna + company boards + Simplify feed) → DB, then dedup |
+| `npm run dedup` | collapse duplicate postings to one canonical row (auto-run by `fetch`) |
 | `npm run curate` | relevance + suitability + skills |
 | `npm run check-links` / `repair-links` | verify / fix job URLs |
 | `npm run analyze` | skills-demand + résumé-gap analysis |
+| `npm run blurbs` | one-line company intros (cached per company) |
 | `npm run digest` | print the daily email body |
 | `npm run serve` | local web tracker (`:3001`) |
 | `npm run poll` | Gmail → advance application stages |
