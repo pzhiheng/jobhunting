@@ -134,11 +134,16 @@ export function createApp(db: Client): Express {
          WHERE j.stage <> 'not_applied' AND j.duplicate_of IS NULL ORDER BY j.posted_at DESC`,
       )
     ).rows;
+    // One milestone per (job, type): a single OA generates several oa-classified
+    // emails (invite, login codes, "completed"), and a confirmation can repeat —
+    // collapse them to the earliest of each type so the timeline reads as stages,
+    // not one pill per email. The raw app_events log is kept intact.
     const events = (
       await db.execute(
-        `SELECT job_id, type, COALESCE(received_at, created_at) AS date FROM app_events
+        `SELECT job_id, type, MIN(COALESCE(received_at, created_at)) AS date FROM app_events
          WHERE job_id IN (SELECT id FROM jobs WHERE stage <> 'not_applied')
-         ORDER BY COALESCE(received_at, created_at)`,
+         GROUP BY job_id, type
+         ORDER BY date`,
       )
     ).rows;
     const byJob: Record<string, { type: string; date: string }[]> = {};

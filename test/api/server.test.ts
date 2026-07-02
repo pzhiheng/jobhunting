@@ -184,6 +184,44 @@ describe("GET /api/skills", () => {
   });
 });
 
+// --- /api/applied timeline ---
+describe("GET /api/applied", () => {
+  test("collapses duplicate same-type events to one milestone per type", async () => {
+    const db2 = await openTestDb();
+    await db2.execute(
+      "INSERT INTO jobs (id, source, external_id, title, company, fetched_at, stage) " +
+        "VALUES ('j','seed','j','SWE Intern','Optiver', datetime('now'), 'oa')",
+    );
+    const ev = (type: string, date: string, subj: string) =>
+      db2.execute({
+        sql: "INSERT INTO app_events (job_id, type, email_id, subject, received_at) VALUES ('j',:t,:e,:s,:d)",
+        args: { t: type, e: subj, s: subj, d: date },
+      });
+    // One real OA milestone, but four oa-classified emails (invite + login codes),
+    // plus one confirmation. The timeline should show Confirmed → OA, not OA×4.
+    await ev("confirmation", "2026-07-01T09:00:00Z", "We received your application");
+    await ev("oa", "2026-07-01T21:00:00Z", "Invitation for assessments");
+    await ev("oa", "2026-07-02T15:00:00Z", "Your login code to the assessment portal");
+    await ev("oa", "2026-07-02T16:00:00Z", "Your login code to the assessment portal");
+
+    const server2 = createServer(createApp(db2));
+    await new Promise<void>((res) => server2.listen(0, "127.0.0.1", res));
+    const { port } = server2.address() as { port: number };
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/applied`);
+      const body = await res.json();
+      const job = body.find((j: { id: string }) => j.id === "j");
+      const oa = job.events.filter((e: { type: string }) => e.type === "oa");
+      assert.equal(oa.length, 1, `expected one OA milestone, got ${oa.length}`);
+      assert.equal(job.events.length, 2, "confirmation + oa only");
+      assert.equal(oa[0].date, "2026-07-01T21:00:00Z", "keeps the earliest (the invite)");
+    } finally {
+      server2.close();
+      db2.close();
+    }
+  });
+});
+
 // --- /api/analyses ---
 describe("GET /api/analyses", () => {
   test("returns 200", async () => {
