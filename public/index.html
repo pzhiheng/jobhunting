@@ -48,6 +48,12 @@
     .timeline .arrow { color:var(--muted); }
     .approw { display:flex; align-items:center; gap:8px; font-size:13px; }
     .approw select { font:inherit; padding:4px 8px; border:1px solid var(--line); border-radius:6px; }
+    .addapp { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:16px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+    .addapp input, .addapp select { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:6px; }
+    .addapp input[name=title] { flex:1; min-width:160px; }
+    .addapp button { font:inherit; padding:6px 14px; border:1px solid var(--accent); background:var(--accent); color:#fff; border-radius:6px; cursor:pointer; }
+    .addapp button:disabled { opacity:.5; cursor:default; }
+    .addmsg { flex-basis:100%; }
     .pill.stage-applied,.pill.stage-confirmed { background:#dbeafe; color:#1e40af; }
     .pill.stage-oa { background:#fef3c7; color:#92400e; }
     .pill.stage-interview { background:#e0e7ff; color:#3730a3; }
@@ -148,10 +154,16 @@
 
     async function renderApplied(el) {
       const jobs = await j("/api/applied");
-      if (!jobs.length) {
-        el.innerHTML = `<div class="empty">No applications tracked yet. Set a job's status to "applied" (here or in any tab) and its dated timeline shows up.</div>`;
-        return;
-      }
+      const addStages = STAGES.filter(s => s !== "not_applied")
+        .map(s => `<option value="${s}">${STAGE_LABEL[s]}</option>`).join("");
+      const form = `<form class="addapp" id="addApp" title="Log a job you applied to on another site">
+        <input name="company" placeholder="Company *" />
+        <input name="title" placeholder="Role / title" />
+        <input name="url" placeholder="Link (optional)" />
+        <select name="stage">${addStages}</select>
+        <button type="submit">Add application</button>
+        <span class="addmsg muted" id="addMsg"></span>
+      </form>`;
       const cards = jobs.map(job => {
         const events = job.events || [];
         const timeline = events.length
@@ -168,8 +180,26 @@
           <div class="approw"><span class="muted">Update status:</span> ${stageSelect(job)}</div>
         </div>`;
       }).join("");
-      el.innerHTML = `<div class="apps">${cards}</div>`;
+      const body = jobs.length ? `<div class="apps">${cards}</div>`
+        : `<div class="empty">No applications tracked yet. Add one you applied to elsewhere above, or set any job's status to "applied".</div>`;
+      el.innerHTML = form + body;
       el.querySelectorAll("select[data-id]").forEach(sel => sel.onchange = () => setStage(sel.dataset.id, sel.value));
+      el.querySelector("#addApp").onsubmit = async (e) => {
+        e.preventDefault();
+        const f = e.target, msg = el.querySelector("#addMsg");
+        const company = f.company.value.trim();
+        if (!company) { msg.textContent = "Company is required."; return; }
+        const btn = f.querySelector("button"); btn.disabled = true;
+        msg.textContent = "Adding…";
+        try {
+          const r = await j("/api/jobs", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ company, title: f.title.value.trim(), url: f.url.value.trim(), stage: f.stage.value }),
+          });
+          if (r.error) { msg.textContent = r.error; btn.disabled = false; }
+          else { loadSummary(); render(); }
+        } catch (err) { msg.textContent = String(err.message || err); btn.disabled = false; }
+      };
     }
 
     async function renderSkills(el) {

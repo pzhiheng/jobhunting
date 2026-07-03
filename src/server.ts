@@ -125,6 +125,37 @@ export function createApp(db: Client): Express {
     res.json({ id: req.params.id, stage });
   });
 
+  // Manually log a job you applied to elsewhere (a site the pipeline never
+  // fetched). Creates a 'manual' job at the given stage + a dated event, so it
+  // shows in the Applied timeline like any other.
+  app.post("/api/jobs", async (req, res) => {
+    const company = String(req.body?.company ?? "").trim();
+    const title = String(req.body?.title ?? "").trim();
+    const url = String(req.body?.url ?? "").trim();
+    const stage = String(req.body?.stage ?? "applied");
+    if (!company) {
+      res.status(400).json({ error: "company is required" });
+      return;
+    }
+    if (!STAGES.includes(stage) || stage === "not_applied") {
+      res.status(400).json({ error: `stage must be one of ${STAGES.filter((s) => s !== "not_applied").join(", ")}` });
+      return;
+    }
+    const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40);
+    const id = `manual:${slug(company)}${title ? "-" + slug(title) : ""}` || `manual:${Date.now()}`;
+    await db.execute({
+      sql: `INSERT INTO jobs (id, source, external_id, title, company, url, fetched_at, status, stage, suitability)
+            VALUES (:id, 'manual', :id, :title, :company, :url, datetime('now'), 'reviewed', :stage, 'unreviewed')
+            ON CONFLICT(id) DO UPDATE SET stage = excluded.stage, url = excluded.url, duplicate_of = NULL`,
+      args: { id, title: title || `${company} application`, company, url: url || null, stage },
+    });
+    await db.execute({
+      sql: "INSERT INTO app_events (job_id, type, received_at) VALUES (:id, :stage, datetime('now'))",
+      args: { id, stage },
+    });
+    res.json({ id, stage });
+  });
+
   // Applied pipeline: each non-not_applied job with its dated stage-event timeline.
   app.get("/api/applied", async (_req, res) => {
     const jobs = (

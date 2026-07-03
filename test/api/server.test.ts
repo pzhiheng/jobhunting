@@ -222,6 +222,43 @@ describe("GET /api/applied", () => {
   });
 });
 
+// --- POST /api/jobs (manual application) ---
+describe("POST /api/jobs", () => {
+  test("logs a manually-applied job and it appears in /api/applied", async () => {
+    const { status, body } = await api("/api/jobs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ company: "Jane Street", title: "SWE Intern", url: "https://x.example/apply", stage: "oa" }),
+    });
+    assert.equal(status, 200);
+    assert.match(body.id, /^manual:jane-street/);
+
+    const applied = (await api("/api/applied")).body;
+    const job = applied.find((j: { id: string }) => j.id === body.id);
+    assert.ok(job, "manual job should be in the applied list");
+    assert.equal(job.stage, "oa");
+    assert.ok(job.events.some((e: { type: string }) => e.type === "oa"), "has a dated oa event");
+  });
+
+  test("400 without a company", async () => {
+    const { status, body } = await api("/api/jobs", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "SWE Intern", stage: "applied" }),
+    });
+    assert.equal(status, 400);
+    assert.match(body.error, /company/);
+  });
+
+  test("400 for an invalid stage", async () => {
+    const { status, body } = await api("/api/jobs", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ company: "Foo", stage: "not_applied" }),
+    });
+    assert.equal(status, 400);
+    assert.ok(body.error.includes("stage must be one of"));
+  });
+});
+
 // --- /api/analyses ---
 describe("GET /api/analyses", () => {
   test("returns 200", async () => {
