@@ -27,7 +27,7 @@ cp .env.example .env
 
 | Variable | Required for | Where to get it |
 |----------|--------------|-----------------|
-| `ANTHROPIC_API_KEY` | `configure`, `curate`, `repair-links`, `analyze`, `poll` | console.anthropic.com → API keys |
+| `ANTHROPIC_API_KEY` | `configure`, `curate`, `analyze`, `poll` | console.anthropic.com → API keys |
 | `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` | `fetch` (job postings) | free dev key at https://developer.adzuna.com/ |
 | `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | **optional** — shared hosted DB | turso.tech. **If unset, a local `jobs.db` file is used** (fine for one machine). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REFRESH_TOKEN` | `poll` (inbox tracking) | Google Cloud OAuth client with the Gmail read scope |
@@ -59,7 +59,6 @@ hand-edit `filter.json`** — it's generated.
 npm run fetch          # pull postings from the job boards → DB
 npm run check-links    # flag dead links
 npm run curate         # relevance + résumé suitability + skills
-npm run repair-links   # repair or expire broken links
 npm run analyze        # skills demand + résumé-gap analysis
 npm run digest         # print the "top picks + counts + skills" digest
 ```
@@ -114,7 +113,6 @@ and `npm run seed` stands in for `fetch` with sample jobs:
 npm run seed
 npm run check-links                 # real HTTP, no key needed
 JOBHUNTER_MOCK=1 npm run curate
-JOBHUNTER_MOCK=1 npm run repair-links
 JOBHUNTER_MOCK=1 npm run analyze
 npm run digest
 npm run serve                       # browse the mock data
@@ -128,7 +126,7 @@ npm run serve                       # browse the mock data
 | `npm run fetch` | job-board APIs (Adzuna + company boards + Simplify feed) → DB, then dedup |
 | `npm run dedup` | collapse duplicate postings to one canonical row (auto-run by `fetch`) |
 | `npm run curate` | relevance + suitability + skills |
-| `npm run check-links` / `repair-links` | verify / fix job URLs |
+| `npm run check-links` | verify job URLs; flags (and re-checks) dead links |
 | `npm run analyze` | skills-demand + résumé-gap analysis |
 | `npm run blurbs` | one-line company intros (cached per company) |
 | `npm run digest` | print the daily email body |

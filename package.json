@@ -10,7 +10,6 @@
     "seed": "tsx src/seed.ts",
     "curate": "tsx src/curate.ts",
     "check-links": "tsx src/check-links.ts",
-    "repair-links": "tsx src/repair-links.ts",
     "poll": "tsx src/email-poller.ts",
     "auth-google": "tsx src/auth-google.ts",
     "refine": "tsx src/refine.ts",

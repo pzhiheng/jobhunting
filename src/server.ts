@@ -14,7 +14,6 @@ const COMMANDS: { id: string; label: string; script: string; takesArg: boolean }
   { id: "fetch", label: "Fetch from job boards", script: "fetch", takesArg: false },
   { id: "check-links", label: "Check links", script: "check-links", takesArg: false },
   { id: "curate", label: "Curate (relevance + suitability)", script: "curate", takesArg: false },
-  { id: "repair-links", label: "Repair links", script: "repair-links", takesArg: false },
   { id: "dedup", label: "Dedup postings", script: "dedup", takesArg: false },
   { id: "analyze", label: "Analyze skills", script: "analyze", takesArg: false },
   { id: "blurbs", label: "Company intros", script: "blurbs", takesArg: false },

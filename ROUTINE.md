@@ -16,7 +16,7 @@ a **connected Gmail** (no email credentials live in this repo). Deploy it with
 ## Pipeline (what runs each day)
 
 ```
-fetch → check-links → curate → blurbs → repair-links → analyze → digest → email
+fetch → check-links → curate → blurbs → analyze → digest → email
 ```
 
 | Step | Command | Effect |
@@ -25,13 +25,13 @@ fetch → check-links → curate → blurbs → repair-links → analyze → dig
 | 2 | `npm run check-links`  | HTTP-check each URL (every not-applied job, every run) → `link_status` |
 | 3 | `npm run curate`       | relevance + résumé suitability + skills for new rows |
 | 4 | `npm run blurbs`       | one-line company intro for any new company → `companies` |
-| 5 | `npm run repair-links` | repair or expire broken links |
-| 6 | `npm run analyze`      | refresh the skills-demand + résumé-gap analysis |
-| 7 | `npm run digest`       | print the email body (Markdown) to stdout |
+| 5 | `npm run analyze`      | refresh the skills-demand + résumé-gap analysis |
+| 6 | `npm run digest`       | print the email body (Markdown) to stdout |
 
 Every step only populates/updates the shared DB — nothing is ever deleted. A
-posting that 404s is flagged (`link_status='broken'/'expired'`), which hides it
-from the tracker's listings; the row itself is kept.
+posting that 404s is flagged (`link_status='broken'`), which hides it from the
+tracker's listings; the row itself is kept, and `check-links` re-checks it every
+run, so it un-hides itself if the posting comes back.
 
 ## Routine prompt (paste into `/schedule`, daily)
 
@@ -43,12 +43,11 @@ from the tracker's listings; the row itself is kept.
 > 2. `npm run check-links`
 > 3. `npm run curate`
 > 4. `npm run blurbs` — generate a one-line intro for any newly-seen company.
-> 5. `npm run repair-links`
-> 6. `npm run poll` — read the inbox (IMAP via the app password, or Gmail OAuth)
+> 5. `npm run poll` — read the inbox (IMAP via the app password, or Gmail OAuth)
 >    to mark jobs already applied to / advanced (so they drop out of Top picks).
 >    **Best-effort:** if no inbox is configured, note it and continue.
-> 7. `npm run analyze`
-> 8. `npm run send-digest` — emails the digest (clickable apply links + skills)
+> 6. `npm run analyze`
+> 7. `npm run send-digest` — emails the digest (clickable apply links + skills)
 >    to `DIGEST_TO` via SMTP. Report the recipient + messageId it prints.
 >
 > If any step other than `poll` fails, stop and report which one and its error.
