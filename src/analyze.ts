@@ -115,6 +115,8 @@ async function realAnalysis(db: Client): Promise<Analysis> {
     },
   ];
 
+  let cacheRead = 0;
+  let cacheWrite = 0;
   for (let i = 0; i < 8; i++) {
     const resp = await client.messages.create({
       model: "claude-sonnet-4-6",
@@ -122,7 +124,12 @@ async function realAnalysis(db: Client): Promise<Analysis> {
       system: ANALYST_SYSTEM,
       tools,
       messages,
+      // Auto-cache the growing prefix (tools + system + prior turns) so each loop
+      // iteration re-reads the accumulating history at ~0.1x instead of full price.
+      cache_control: { type: "ephemeral" },
     });
+    cacheRead += resp.usage.cache_read_input_tokens ?? 0;
+    cacheWrite += resp.usage.cache_creation_input_tokens ?? 0;
     if (resp.stop_reason !== "tool_use") break;
     messages.push({ role: "assistant", content: resp.content });
     const results: Anthropic.ToolResultBlockParam[] = [];
@@ -146,7 +153,13 @@ async function realAnalysis(db: Client): Promise<Analysis> {
     max_tokens: 1024,
     messages: [...messages, { role: "user", content: "Return your final structured analysis." }],
     output_config: { format: zodOutputFormat(AnalysisSchema) },
+    cache_control: { type: "ephemeral" }, // reads the history the loop just cached
   });
+  cacheRead += final.usage.cache_read_input_tokens ?? 0;
+  cacheWrite += final.usage.cache_creation_input_tokens ?? 0;
+  if (cacheRead || cacheWrite) {
+    console.error(`  [analyze] prompt cache: ${cacheRead} tokens read (~0.1x), ${cacheWrite} written`);
+  }
   if (!final.parsed_output) throw new Error("Analyst returned no structured analysis.");
   return final.parsed_output;
 }
