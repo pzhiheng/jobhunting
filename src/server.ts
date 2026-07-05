@@ -9,18 +9,33 @@ const PORT = Number(process.env.PORT ?? 3001);
 const PUBLIC_DIR = new URL("../public", import.meta.url).pathname;
 
 // Allow-list of pipeline npm scripts runnable from the control panel.
-const COMMANDS: { id: string; label: string; script: string; takesArg: boolean }[] = [
-  { id: "seed", label: "Seed sample jobs", script: "seed", takesArg: false },
-  { id: "fetch", label: "Fetch from job boards", script: "fetch", takesArg: false },
-  { id: "check-links", label: "Check links", script: "check-links", takesArg: false },
-  { id: "curate", label: "Curate (relevance + suitability)", script: "curate", takesArg: false },
-  { id: "dedup", label: "Dedup postings", script: "dedup", takesArg: false },
-  { id: "analyze", label: "Analyze skills", script: "analyze", takesArg: false },
-  { id: "blurbs", label: "Company intros", script: "blurbs", takesArg: false },
-  { id: "digest", label: "Build digest", script: "digest", takesArg: false },
-  { id: "poll", label: "Poll inbox", script: "poll", takesArg: false },
-  { id: "configure", label: "Configure search", script: "configure", takesArg: true },
-  { id: "refine", label: "Refine filter", script: "refine", takesArg: true },
+// "pipeline" commands are listed in daily-run order; "tools" are on-demand.
+const COMMANDS: {
+  id: string; label: string; script: string; takesArg: boolean;
+  group: "pipeline" | "tools"; desc: string;
+}[] = [
+  { id: "fetch", label: "Fetch postings", script: "fetch", takesArg: false, group: "pipeline",
+    desc: "Pull new postings from Adzuna, company career boards, and the Simplify feed, then collapse duplicates." },
+  { id: "check-links", label: "Check links", script: "check-links", takesArg: false, group: "pipeline",
+    desc: "Re-check every posting's apply link — dead ones are hidden until they come back." },
+  { id: "curate", label: "Curate", script: "curate", takesArg: false, group: "pipeline",
+    desc: "Score each new posting against your résumé: relevance, fit, and required skills. Costs a few cents." },
+  { id: "blurbs", label: "Company intros", script: "blurbs", takesArg: false, group: "pipeline",
+    desc: "Write a one-line introduction for any company seen for the first time." },
+  { id: "poll", label: "Poll inbox", script: "poll", takesArg: false, group: "pipeline",
+    desc: "Read your email and record confirmations, OAs, interviews, offers, and rejections automatically." },
+  { id: "analyze", label: "Analyze skills", script: "analyze", takesArg: false, group: "pipeline",
+    desc: "Refresh the in-demand-skills and résumé-gap analysis across everything tracked." },
+  { id: "digest", label: "Build digest", script: "digest", takesArg: false, group: "pipeline",
+    desc: "Preview today's digest email without sending it." },
+  { id: "configure", label: "Configure search", script: "configure", takesArg: true, group: "tools",
+    desc: "Rebuild the search from a plain-English request — what roles, where, what to exclude." },
+  { id: "refine", label: "Refine filter", script: "refine", takesArg: true, group: "tools",
+    desc: "Adjust the current search without starting over — e.g. “add AI engineer intern”." },
+  { id: "dedup", label: "Dedup postings", script: "dedup", takesArg: false, group: "tools",
+    desc: "Collapse duplicate postings to one canonical row. Also runs automatically after every fetch." },
+  { id: "seed", label: "Seed sample jobs", script: "seed", takesArg: false, group: "tools",
+    desc: "Load four sample postings to try the tracker without any credentials." },
 ];
 
 const STAGES = [

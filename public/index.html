@@ -4,66 +4,147 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Job Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;600;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
-    :root { --fg:#1c1c1e; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; --bg:#f8fafc; }
+    /* ——— Application-ledger design tokens ——— */
+    :root {
+      --paper:#EEF0E9;      /* cool bond paper */
+      --card:#FBFBF7;       /* raised sheet */
+      --ink:#242A31;        /* iron-gall ink */
+      --muted:#6A727C;
+      --rule:#D5D8CC;
+      --rule-soft:#E4E6DC;
+      --blue:#2B4EA2;       /* form ink blue */
+      --blue-deep:#24418A;
+      --red:#A03A2C;        /* stamp red */
+      --green:#2C6B4E;      /* stamp green */
+      --amber:#8F6B1C;
+      --teal:#20606A;
+      --sans:'Libre Franklin', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono:'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
     * { box-sizing: border-box; }
-    body { margin:0; font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--fg); background:var(--bg); }
-    header { padding:18px 24px; border-bottom:1px solid var(--line); background:#fff; }
-    h1 { margin:0 0 6px; font-size:18px; }
-    #summary { color:var(--muted); font-size:13px; }
-    nav { display:flex; gap:4px; padding:0 24px; background:#fff; border-bottom:1px solid var(--line); flex-wrap:wrap; }
-    nav button { border:0; background:none; padding:12px 14px; cursor:pointer; color:var(--muted); font-size:14px; border-bottom:2px solid transparent; }
-    nav button.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
-    main { padding:20px 24px; }
-    table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
-    th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
-    th { background:#fafafa; font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); }
-    tr:last-child td { border-bottom:0; }
-    a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
-    .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; }
-    .suitable { background:#dcfce7; color:#166534; } .unsuitable { background:#fee2e2; color:#991b1b; } .unreviewed { background:#f1f5f9; color:#475569; }
-    .ok { color:#166534; } .broken, .expired { color:#991b1b; } .repaired { color:#9a6700; } .unchecked { color:var(--muted); }
-    .rel { font-weight:600; }
-    select { font:inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; }
+    body { margin:0; font:14px/1.55 var(--sans); color:var(--ink); background:var(--paper); }
+    :focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+    a { color:var(--blue); text-decoration:none; } a:hover { text-decoration:underline; }
     .muted { color:var(--muted); }
+    .label { font:600 10px/1 var(--mono); text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:10px; }
+
+    /* ——— Masthead ——— */
+    header { padding:20px 28px 12px; }
+    .mast { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; }
+    .eyebrow { font:500 10px/1 var(--mono); text-transform:uppercase; letter-spacing:.18em; color:var(--muted); margin-bottom:7px; }
+    h1 { margin:0; font:900 26px/1 var(--sans); text-transform:uppercase; letter-spacing:.02em; }
+    .mastmeta { text-align:right; font:400 10.5px/1.7 var(--mono); color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+    #summary { margin-top:12px; padding-top:8px; border-top:2px solid var(--ink); font:400 12px/1.5 var(--mono); color:var(--muted); }
+
+    /* ——— Folder tabs ——— */
+    nav { display:flex; gap:6px; padding:6px 28px 0; align-items:flex-end; border-bottom:1px solid var(--ink); flex-wrap:wrap; }
+    nav button { font:600 11px/1 var(--mono); text-transform:uppercase; letter-spacing:.11em; color:var(--muted);
+      padding:10px 13px 9px; border:1px solid transparent; border-bottom:none; background:none; cursor:pointer;
+      border-radius:6px 6px 0 0; margin-bottom:-1px; }
+    nav button:hover { color:var(--ink); }
+    nav button.active { color:var(--ink); background:var(--card); border-color:var(--ink); }
+    main { padding:22px 28px 48px; max-width:1280px; }
+
+    /* ——— Ledger table ——— */
+    table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--rule); }
+    th { font:600 10px/1.4 var(--mono); text-transform:uppercase; letter-spacing:.12em; color:var(--muted);
+      text-align:left; padding:10px 12px; border-bottom:1px solid var(--ink); background:var(--card); }
+    td { text-align:left; padding:11px 12px; border-bottom:1px solid var(--rule-soft); vertical-align:top; }
+    tr:last-child td { border-bottom:0; }
+    tbody tr:hover td { background:#F2F3EA; }
+    .posted { font-family:var(--mono); font-size:12px; white-space:nowrap; color:var(--muted); }
+    .rel { font:600 12px var(--mono); }
     .blurb { font-size:12px; color:var(--muted); max-width:300px; margin-top:3px; }
-    .posted { white-space:nowrap; color:var(--muted); }
-    .empty { padding:32px; text-align:center; color:var(--muted); }
-    .panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:16px; }
+
+    /* ——— Stamps ——— */
+    .pill { display:inline-block; padding:2px 7px; border:1.5px solid currentColor; border-radius:3px; background:none;
+      font:600 9.5px/1.5 var(--mono); text-transform:uppercase; letter-spacing:.09em; }
+    .suitable { color:var(--green); } .unsuitable { color:var(--red); } .unreviewed { color:var(--muted); }
+    .ok, .broken, .expired, .repaired, .unchecked { font-family:var(--mono); font-size:11.5px; }
+    .ok { color:var(--green); } .broken, .expired { color:var(--red); } .repaired { color:var(--amber); } .unchecked { color:var(--muted); }
+    .pill.stage-applied, .pill.stage-confirmed { color:var(--blue); }
+    .pill.stage-oa { color:var(--amber); }
+    .pill.stage-interview { color:var(--teal); }
+    .pill.stage-offer { color:var(--green); }
+    .pill.stage-rejected { color:var(--red); }
+
+    select { font:12px var(--mono); padding:4px 6px; border:1px solid var(--rule); border-radius:3px; background:var(--card); color:var(--ink); }
+    .empty { padding:40px; text-align:center; color:var(--muted); background:var(--card); border:1px dashed var(--rule); }
+    .panel { background:var(--card); border:1px solid var(--rule); padding:16px 18px; margin-bottom:18px; }
     .panel p { margin:6px 0 12px; } .panel .pill { margin:2px; }
-    .label { font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:4px; }
-    .cmds { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
-    .cmd { display:flex; align-items:center; gap:4px; }
-    .cmd button { font:inherit; padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--fg); cursor:pointer; }
-    .cmd button:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
-    .cmd button:disabled { opacity:.5; cursor:default; }
-    .cmd input { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px; width:200px; }
-    .log { background:#0f172a; color:#e2e8f0; border-radius:8px; padding:14px 16px; max-height:420px; overflow:auto; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; word-break:break-word; }
-    .log .badge { font-weight:600; } .log .badge.ok { color:#4ade80; } .log .badge.fail { color:#f87171; }
-    .apps { display:flex; flex-direction:column; gap:12px; }
-    .appcard { border:1px solid var(--line); border-radius:8px; padding:12px 16px; background:#fff; }
+
+    /* ——— Run tab: numbered pipeline ——— */
+    .runhead { font:400 12px/1.7 var(--mono); color:var(--muted); margin-bottom:18px; max-width:72ch; }
+    .cmdgroup { background:var(--card); border:1px solid var(--rule); padding:14px 18px 4px; margin-bottom:18px; }
+    .cmd { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--rule-soft); flex-wrap:wrap; }
+    .cmd:last-child { border-bottom:0; }
+    .step { font:500 10px var(--mono); color:var(--muted); width:20px; flex:none; letter-spacing:.05em; }
+    .cmd button { font:600 12.5px var(--sans); min-width:158px; text-align:left; padding:7px 12px;
+      border:1px solid var(--rule); background:#fff; color:var(--ink); cursor:pointer; border-radius:3px; }
+    .cmd button:hover:not(:disabled) { border-color:var(--blue); color:var(--blue); }
+    .cmd button:active:not(:disabled) { transform:translateY(1px); }
+    .cmd button:disabled { opacity:.45; cursor:default; }
+    .cmddesc { flex:1; min-width:240px; font-size:12.5px; color:var(--muted); }
+    .cmd input { font:12.5px var(--sans); padding:7px 10px; border:1px solid var(--rule); border-radius:3px; width:220px; background:#fff; }
+    .log { background:#22262C; color:#D8DCD3; padding:16px 18px; max-height:420px; overflow:auto;
+      font:11.5px/1.6 var(--mono); white-space:pre-wrap; word-break:break-word; border:1px solid var(--ink); }
+    .log .badge { font-weight:600; }
+    .log .badge.ok { color:#72C795; } .log .badge.fail { color:#E07863; }
+    .log .muted { color:#9AA29B; }
+
+    /* ——— Applied dossiers ——— */
+    .apps { display:flex; flex-direction:column; gap:14px; }
+    .appcard { border:1px solid var(--rule); padding:14px 18px; background:var(--card); }
     .apphead { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
-    .timeline { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:10px 0; }
-    .timeline .ev { font-size:12px; line-height:1.3; padding:4px 8px; border:1px solid var(--line); border-radius:6px; background:#f8fafc; }
+    .apphead .pill { font-size:11px; padding:4px 10px; border-width:2px; border-radius:4px; transform:rotate(-2deg); flex:none; margin-top:2px; }
+    .timeline { display:flex; align-items:center; flex-wrap:wrap; gap:7px; margin:12px 0 10px; }
+    .timeline .ev { font:500 10px/1.5 var(--mono); text-transform:uppercase; letter-spacing:.06em;
+      padding:5px 9px; border:1px solid var(--rule); background:none; }
+    .timeline .ev .muted { text-transform:none; letter-spacing:0; }
     .timeline .arrow { color:var(--muted); }
-    .approw { display:flex; align-items:center; gap:8px; font-size:13px; }
-    .approw select { font:inherit; padding:4px 8px; border:1px solid var(--line); border-radius:6px; }
-    .addapp { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:16px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
-    .addapp input, .addapp select { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:6px; }
-    .addapp input[name=title] { flex:1; min-width:160px; }
-    .addapp button { font:inherit; padding:6px 14px; border:1px solid var(--accent); background:var(--accent); color:#fff; border-radius:6px; cursor:pointer; }
+    .approw { display:flex; align-items:center; gap:8px; font-size:12.5px; }
+
+    /* ——— File an application ——— */
+    .addapp { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; margin-bottom:18px;
+      background:var(--card); border:1px solid var(--rule); padding:14px 18px; }
+    .addapp .label { flex-basis:100%; margin-bottom:2px; }
+    .addapp input { font:13px var(--sans); padding:7px 2px; border:0; border-bottom:1px solid var(--rule); border-radius:0; background:none; color:var(--ink); }
+    .addapp input:focus { outline:none; border-bottom-color:var(--blue); }
+    .addapp input[name=title] { flex:1; min-width:150px; }
+    .addapp button { font:600 11px var(--mono); text-transform:uppercase; letter-spacing:.09em; padding:8px 16px;
+      border:1px solid var(--blue); background:var(--blue); color:#fff; cursor:pointer; border-radius:3px; }
+    .addapp button:hover:not(:disabled) { background:var(--blue-deep); border-color:var(--blue-deep); }
     .addapp button:disabled { opacity:.5; cursor:default; }
-    .addmsg { flex-basis:100%; }
-    .pill.stage-applied,.pill.stage-confirmed { background:#dbeafe; color:#1e40af; }
-    .pill.stage-oa { background:#fef3c7; color:#92400e; }
-    .pill.stage-interview { background:#e0e7ff; color:#3730a3; }
-    .pill.stage-offer { background:#dcfce7; color:#166534; }
-    .pill.stage-rejected { background:#fee2e2; color:#991b1b; }
+    .addmsg { flex-basis:100%; font-size:12px; }
+
+    @media (max-width: 720px) {
+      header, nav, main { padding-left:16px; padding-right:16px; }
+      main { overflow-x:auto; }
+      table { min-width:720px; }
+      .cmddesc { flex-basis:100%; margin-left:32px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { transition:none !important; animation:none !important; }
+      .cmd button:active:not(:disabled) { transform:none; }
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Job Tracker</h1>
+    <div class="mast">
+      <div>
+        <div class="eyebrow">Personal application ledger</div>
+        <h1>Job Tracker</h1>
+      </div>
+      <div class="mastmeta">
+        <div id="today"></div>
+        <div>daily run · 8 pm</div>
+      </div>
+    </div>
     <div id="summary">loading…</div>
   </header>
   <nav id="tabs"></nav>
@@ -120,7 +201,7 @@
       if (active === "applied") return renderApplied(el);
 
       const jobs = await j(`/api/jobs?section=${active}`);
-      if (!jobs.length) { el.innerHTML = `<div class="empty">No jobs here yet.</div>`; return; }
+      if (!jobs.length) { el.innerHTML = `<div class="empty">Nothing filed under this tab yet.</div>`; return; }
       const rows = jobs.map(job => `
         <tr>
           <td>${job.url ? `<a href="${esc(job.url)}" target="_blank" rel="noopener">${esc(job.title)}</a>` : esc(job.title)}
@@ -157,6 +238,7 @@
       const addStages = STAGES.filter(s => s !== "not_applied")
         .map(s => `<option value="${s}">${STAGE_LABEL[s]}</option>`).join("");
       const form = `<form class="addapp" id="addApp" title="Log a job you applied to on another site">
+        <div class="label">File an application</div>
         <input name="company" placeholder="Company *" />
         <input name="title" placeholder="Role / title" />
         <input name="url" placeholder="Link (optional)" />
@@ -165,7 +247,15 @@
         <span class="addmsg muted" id="addMsg"></span>
       </form>`;
       const cards = jobs.map(job => {
-        const events = job.events || [];
+        // One pill per milestone *label*: 'confirmation' (email) and 'confirmed'
+        // (manual) are distinct raw types but the same milestone — keep the earliest.
+        const seenLabel = new Set();
+        const events = (job.events || []).filter(e => {
+          const l = EVENT_LABEL[e.type] || e.type;
+          if (seenLabel.has(l)) return false;
+          seenLabel.add(l);
+          return true;
+        });
         const timeline = events.length
           ? events.map(e => `<span class="ev"><b>${esc(EVENT_LABEL[e.type] || e.type)}</b><br><span class="muted">${fmtDate(e.date)}</span></span>`).join('<span class="arrow">→</span>')
           : `<span class="muted">no dated events yet</span>`;
@@ -181,7 +271,7 @@
         </div>`;
       }).join("");
       const body = jobs.length ? `<div class="apps">${cards}</div>`
-        : `<div class="empty">No applications tracked yet. Add one you applied to elsewhere above, or set any job's status to "applied".</div>`;
+        : `<div class="empty">No applications on file yet. Add one you applied to elsewhere above, or set any job's status to "applied".</div>`;
       el.innerHTML = form + body;
       el.querySelectorAll("select[data-id]").forEach(sel => sel.onchange = () => setStage(sel.dataset.id, sel.value));
       el.querySelector("#addApp").onsubmit = async (e) => {
@@ -214,7 +304,7 @@
             (gap ? `<div class="label">Skills to learn</div><div>${gap}</div>` : "") + `</div>`;
         } catch {}
       }
-      if (!skills.length) { el.innerHTML = panel + `<div class="empty">No skills extracted yet.</div>`; return; }
+      if (!skills.length) { el.innerHTML = panel + `<div class="empty">No skills extracted yet — run Curate first.</div>`; return; }
       const rows = skills.map(s =>
         `<tr><td>${esc(s.skill)}</td><td>${esc(s.category)}</td><td class="rel">${s.count}</td></tr>`).join("");
       el.innerHTML = panel + `<table><thead><tr><th>Skill</th><th>Category</th><th>Jobs</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -224,13 +314,18 @@
 
     async function renderRun(el) {
       if (!commands) commands = await j("/api/commands");
-      const buttons = commands.map(c =>
-        `<div class="cmd">
-           <button data-cmd="${esc(c.id)}">${esc(c.label)}</button>` +
-        (c.takesArg ? `<input data-arg="${esc(c.id)}" placeholder="argument…" />` : "") +
-        `</div>`).join("");
+      const pipeline = commands.filter(c => c.group === "pipeline");
+      const tools = commands.filter(c => c.group !== "pipeline");
+      const row = (c, i) => `<div class="cmd">
+          <span class="step">${i == null ? "·" : String(i + 1).padStart(2, "0")}</span>
+          <button data-cmd="${esc(c.id)}">${esc(c.label)}</button>` +
+        (c.takesArg ? `<input data-arg="${esc(c.id)}" placeholder="${c.id === "configure" ? "describe the search…" : "adjust it…"}" />` : "") +
+        `<span class="cmddesc">${esc(c.desc || "")}</span>
+        </div>`;
       el.innerHTML =
-        `<div class="cmds">${buttons}</div>` +
+        `<div class="runhead">The whole pipeline runs by itself every day at 8&nbsp;PM and emails the digest — these buttons run any step on demand.</div>` +
+        `<div class="cmdgroup"><div class="label">Daily pipeline</div>${pipeline.map((c, i) => row(c, i)).join("")}</div>` +
+        `<div class="cmdgroup"><div class="label">Search &amp; tools</div>${tools.map(c => row(c)).join("")}</div>` +
         `<div class="log" id="runlog"><span class="muted">Click a command to run it.</span></div>`;
       const log = el.querySelector("#runlog");
       el.querySelectorAll("button[data-cmd]").forEach(btn => {
@@ -265,6 +360,8 @@
       }
     }
 
+    document.getElementById("today").textContent =
+      new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
     renderTabs(); render(); loadSummary();
   </script>
 </body>
