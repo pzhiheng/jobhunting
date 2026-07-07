@@ -85,7 +85,19 @@ async function main() {
   }
 
   writeFileSync(FILTER_PATH, JSON.stringify(updated, null, 2) + "\n");
-  writeFileSync(REQUEST_PATH, instruction + "\n");
+  // Append (never overwrite): request.md is the accumulated source of intent, so
+  // a later bare `configure` re-parse still knows everything ever asked for.
+  let requestDoc = "";
+  try {
+    requestDoc = readFileSync(REQUEST_PATH, "utf8").trimEnd();
+  } catch {
+    /* no request.md yet — start one */
+  }
+  const stamp = new Date().toISOString().slice(0, 10);
+  writeFileSync(
+    REQUEST_PATH,
+    (requestDoc ? requestDoc + "\n" : "") + `Refinement (${stamp}): ${instruction}\n`,
+  );
   console.log(
     `Refined filter.json: ${updated.searches.length} searches, ` +
       `${updated.criteria.mustHaves.length} must-haves. (${signal})`,
