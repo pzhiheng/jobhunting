@@ -18,6 +18,7 @@ interface Entry {
   title: string;
   url: string;
   locations?: string[];
+  terms?: string[]; // start terms, e.g. ["Summer 2027"]; "N/A" or absent = unstated
   date_posted?: number; // unix seconds
   active?: boolean;
   is_visible?: boolean;
@@ -52,8 +53,11 @@ function categoryOf(entry: Entry): string {
   return "swe";
 }
 
+const realTerms = (e: Entry) => (e.terms ?? []).filter((t) => t && t !== "N/A");
+
 export function normalizeSimplify(entry: Entry): NormalizedJob {
   const locations = (entry.locations ?? []).filter(Boolean);
+  const terms = realTerms(entry);
   return {
     id: `simplify:${entry.id}`,
     source: "simplify",
@@ -63,7 +67,9 @@ export function normalizeSimplify(entry: Entry): NormalizedJob {
     location: locations.join("; "),
     remote: locations.some((l) => /remote/i.test(l)),
     url: entry.url,
-    description: "",
+    // Surface the start term so curate can judge it against the filter's window;
+    // many postings state no term at all, and those must stay judgeable too.
+    description: terms.length ? `Start term(s): ${terms.join(", ")}` : "",
     salaryMin: null,
     salaryMax: null,
     category: categoryOf(entry),
@@ -71,12 +77,22 @@ export function normalizeSimplify(entry: Entry): NormalizedJob {
   };
 }
 
-/** Pure filter — exported for tests. Active + visible + in-domain + US, freshest first. */
+// The hunt targets starts inside 2027 (see request.md). An entry that explicitly
+// declares only non-2027 terms is skipped at fetch time so curate never pays to
+// reject it; entries with no stated term always pass (companies often omit it).
+const TERM_WINDOW_RE = /2027/;
+
+/** Pure filter — exported for tests. Active + visible + in-domain + US +
+ *  (undated or in-window term), freshest first. */
 export function selectEntries(all: Entry[]): Entry[] {
   return all
     .filter((e) => e.active !== false && e.is_visible !== false)
     .filter((e) => CATEGORY_RE.test(e.category ?? ""))
     .filter((e) => (e.locations ?? []).some(locationIsUS))
+    .filter((e) => {
+      const terms = realTerms(e);
+      return terms.length === 0 || terms.some((t) => TERM_WINDOW_RE.test(t));
+    })
     .sort((a, b) => (b.date_posted ?? 0) - (a.date_posted ?? 0))
     .slice(0, CAP);
 }

@@ -133,14 +133,15 @@ export async function upsertJob(db: Client, job: NormalizedJob): Promise<boolean
             :description, :salaryMin, :salaryMax, :category, :postedAt, :fetchedAt, :dedupKey
           )
           ON CONFLICT(id) DO UPDATE SET
-            title      = excluded.title,
-            company    = excluded.company,
-            location   = excluded.location,
-            url        = excluded.url,
-            salary_min = excluded.salary_min,
-            salary_max = excluded.salary_max,
-            fetched_at = excluded.fetched_at,
-            dedup_key  = excluded.dedup_key`,
+            title       = excluded.title,
+            company     = excluded.company,
+            location    = excluded.location,
+            url         = excluded.url,
+            description = excluded.description,
+            salary_min  = excluded.salary_min,
+            salary_max  = excluded.salary_max,
+            fetched_at  = excluded.fetched_at,
+            dedup_key   = excluded.dedup_key`,
     args: {
       id: job.id,
       source: job.source,
