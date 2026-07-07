@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeSimplify, selectEntries, locationIsUS } from "../../src/sources/simplify.js";
+import { normalizeSimplify, selectEntries, locationIsUS, qualifySeason } from "../../src/sources/simplify.js";
 
 test("locationIsUS accepts US states / bare remote, rejects foreign", () => {
   assert.ok(locationIsUS("San Bruno, CA"));
@@ -45,6 +45,26 @@ test("selectEntries keeps active US SWE/ML roles and drops the rest", () => {
   ];
   const kept = selectEntries(entries as never[]).map((e) => (e as { id: string }).id);
   assert.deepEqual(kept.sort(), ["1", "2"]);
+});
+
+test("vansh-feed entries work: yearless season is cycle-qualified, no category passes", () => {
+  // The real feed has season "Summer" (no year) and no category field.
+  const raw = [
+    { id: "v1", company_name: "Optiver", title: "Software Engineer Intern", url: "https://optiver.com/apply", locations: ["Chicago, IL"], season: "Summer", date_posted: 1751000000, active: true, is_visible: true },
+  ];
+  const qualified = qualifySeason(raw as never[], "2027");
+  assert.deepEqual((qualified[0] as { terms?: string[] }).terms, ["Summer 2027"]);
+
+  // Qualified entries survive the 2027 window + missing-category filters…
+  const kept = selectEntries(qualified);
+  assert.equal(kept.length, 1);
+  // …and unqualified ("Summer" only) would have been dropped by the window.
+  assert.equal(selectEntries(raw as never[]).length, 0);
+
+  const job = normalizeSimplify(kept[0], "vansh2027");
+  assert.equal(job.id, "vansh2027:v1");
+  assert.equal(job.source, "vansh2027");
+  assert.match(job.description, /Summer 2027/);
 });
 
 test("selectEntries drops explicit non-2027 terms but keeps undated and 2027 postings", () => {

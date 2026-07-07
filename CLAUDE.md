@@ -84,8 +84,9 @@ the DB is libSQL/Turso (a shared client), not an in-process file by default.
   redirect URL), `companyBoards.ts` (keyless Greenhouse/Lever/Ashby boards for
   the companies in `companies.json` → **direct employer apply URLs**; keeps only
   titles matching the filter's intent via `makeKeepFilter`), and `simplify.ts`
-  (the keyless SimplifyJobs/Pitt-CSC daily internship JSON feed → direct apply
-  links; filtered to active US SWE/ML/Data roles).
+  (keyless community internship JSON feeds — SimplifyJobs/Pitt-CSC plus the
+  vanshb03 Summer-2027 list, whose yearless `season` is cycle-qualified →
+  direct apply links; filtered to active, in-window US SWE/ML roles).
 - **`dedup.ts`** — `dedupeJobs()` collapses postings with the same fingerprint
   (`dedupKey` = `company|title`, location-independent so aggregator location noise
   doesn't split a role) to one canonical row; the rest get `duplicate_of` set and

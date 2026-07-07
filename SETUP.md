@@ -123,7 +123,7 @@ npm run serve                       # browse the mock data
 | Command | What it does |
 |---------|--------------|
 | `npm run configure "<request>"` | NL request → `filter.json` (+ `request.md`) |
-| `npm run fetch` | job-board APIs (Adzuna + company boards + Simplify feed) → DB, then dedup |
+| `npm run fetch` | job-board APIs (Adzuna + company boards + community internship feeds) → DB, then dedup |
 | `npm run dedup` | collapse duplicate postings to one canonical row (auto-run by `fetch`) |
 | `npm run curate` | relevance + suitability + skills |
 | `npm run check-links` | verify job URLs; flags (and re-checks) dead links |
