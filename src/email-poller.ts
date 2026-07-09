@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { fileURLToPath } from "node:url";
 import { ImapFlow } from "imapflow";
+import { simpleParser } from "mailparser";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -19,8 +20,11 @@ interface RawEmail {
 
 type EventType = "confirmation" | "oa" | "interview" | "offer" | "rejection" | "other";
 
+// A company acknowledging your application and you marking it applied are the
+// same milestone to the user — both map to 'applied' (the old separate
+// 'confirmed' stage was confusing).
 const EVENT_STAGE: Partial<Record<EventType, string>> = {
-  confirmation: "confirmed",
+  confirmation: "applied",
   oa: "oa",
   interview: "interview",
   offer: "offer",
@@ -29,8 +33,9 @@ const EVENT_STAGE: Partial<Record<EventType, string>> = {
 
 // Stage order, so a stray late email can't regress a job (e.g. a generic
 // "application received" after you already have an interview). Higher wins.
+// 'confirmed' is a legacy alias for 'applied' (pre-merge rows).
 const STAGE_RANK: Record<string, number> = {
-  not_applied: 0, applied: 1, confirmed: 2, oa: 3, interview: 4, offer: 5, rejected: 6,
+  not_applied: 0, applied: 1, confirmed: 1, oa: 3, interview: 4, offer: 5, rejected: 6,
 };
 
 // --- Mock fixture inbox (referencing seeded companies) ---
@@ -51,11 +56,11 @@ const MOCK_INBOX: RawEmail[] = [
 
 // --- Email fetching: mock fixture, IMAP (app password), or Gmail OAuth REST ---
 
-async function fetchEmails(): Promise<RawEmail[]> {
+async function fetchEmails(alreadySeen: Set<string>): Promise<RawEmail[]> {
   if (isMock()) return MOCK_INBOX;
   // Prefer IMAP with an app password (simplest — reuses the SMTP creds); fall
   // back to the Gmail OAuth REST path if only GOOGLE_* is configured.
-  if (process.env.IMAP_USER || process.env.SMTP_USER) return fetchViaImap();
+  if (process.env.IMAP_USER || process.env.SMTP_USER) return fetchViaImap(alreadySeen);
   if (process.env.GOOGLE_CLIENT_ID) return fetchViaGmailOAuth();
   throw new Error(
     "No inbox configured. Set IMAP_USER/IMAP_PASS (or SMTP_USER/SMTP_PASS for IMAP via " +
@@ -63,8 +68,16 @@ async function fetchEmails(): Promise<RawEmail[]> {
   );
 }
 
-/** Read recent inbox messages over IMAP using an app password (no OAuth). */
-async function fetchViaImap(): Promise<RawEmail[]> {
+/** Squash a parsed email body into a short classifiable snippet. */
+function toSnippet(text: string): string {
+  return text.replace(/\s+/g, " ").trim().slice(0, 700);
+}
+
+/** Read recent inbox messages over IMAP using an app password (no OAuth).
+ *  Bodies are downloaded only for messages not already recorded — the body is
+ *  what separates a rejection from a confirmation when the subject is bland
+ *  ("Thank you for your interest in …"). */
+async function fetchViaImap(alreadySeen: Set<string>): Promise<RawEmail[]> {
   const user = process.env.IMAP_USER || process.env.SMTP_USER;
   const pass = process.env.IMAP_PASS || process.env.SMTP_PASS;
   if (!user || !pass) {
@@ -97,6 +110,7 @@ async function fetchViaImap(): Promise<RawEmail[]> {
         continue; // folder doesn't exist on this server — skip it
       }
       try {
+        const pending: { index: number; uid: number }[] = [];
         for await (const msg of client.fetch({ since }, { envelope: true, uid: true })) {
           const env = msg.envelope;
           if (!env) continue;
@@ -105,6 +119,7 @@ async function fetchViaImap(): Promise<RawEmail[]> {
           const id = env.messageId || `imap-uid:${folder}:${msg.uid}`;
           if (seen.has(id)) continue;
           seen.add(id);
+          if (!alreadySeen.has(id)) pending.push({ index: emails.length, uid: msg.uid });
           emails.push({
             id,
             from: a ? `${a.name ?? ""} <${a.address ?? ""}>`.trim() : "",
@@ -112,6 +127,19 @@ async function fetchViaImap(): Promise<RawEmail[]> {
             snippet: "",
             receivedAt: env.date instanceof Date ? env.date.toISOString() : new Date().toISOString(),
           });
+        }
+        // Download bodies only for messages not already recorded (main() skips
+        // recorded ones anyway, so their bodies would be wasted downloads).
+        for (const p of pending) {
+          try {
+            const dl = await client.download(String(p.uid), undefined, { uid: true });
+            const parsed = await simpleParser(dl.content);
+            const text =
+              parsed.text || (parsed.html ? String(parsed.html).replace(/<[^>]+>/g, " ") : "");
+            emails[p.index].snippet = toSnippet(text);
+          } catch {
+            // body unavailable — classify from the subject alone, as before
+          }
         }
       } finally {
         lock.release();
@@ -192,7 +220,9 @@ type Classification = z.infer<typeof ClassificationSchema>;
 const CLASSIFY_SYSTEM = `Classify a recruiting email about a job application into one of:
 "confirmation" (application received/acknowledged), "oa" (online assessment / coding
 challenge invite), "interview" (interview invitation/scheduling), "offer" (a job offer),
-"rejection" (declined / not moving forward), or "other". Also extract the hiring
+"rejection" (declined / not moving forward), or "other". Subjects like "Thank you for
+your interest" or "Update on your application" can be either a confirmation or a
+rejection — decide from the body text, not the subject. Also extract the hiring
 company's name, and the specific job title/role the email is about (empty string if
 none is mentioned).`;
 
@@ -289,18 +319,19 @@ export async function createJobFromEmail(db: Client, c: Classification): Promise
 async function main() {
   const db = await openDb();
   const client = isMock() ? null : new Anthropic();
-  const emails = await fetchEmails();
+  const alreadySeen = new Set<string>(
+    (
+      await db.execute("SELECT DISTINCT email_id FROM app_events WHERE email_id IS NOT NULL")
+    ).rows.map((r) => String(r.email_id)),
+  );
+  const emails = await fetchEmails(alreadySeen);
 
   let recorded = 0;
   let advanced = 0;
   let created = 0;
   let skipped = 0;
   for (const email of emails) {
-    const seen = await db.execute({
-      sql: "SELECT 1 FROM app_events WHERE email_id = :eid",
-      args: { eid: email.id },
-    });
-    if (seen.rows.length) { skipped++; continue; }
+    if (alreadySeen.has(email.id)) { skipped++; continue; }
 
     const c = await classify(email, client);
     const stage = EVENT_STAGE[c.type];

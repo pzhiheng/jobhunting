@@ -68,7 +68,7 @@ const SCHEMA = `
     suitability_notes TEXT,
     link_status     TEXT NOT NULL DEFAULT 'unchecked',        -- ok|broken|expired|repaired|unchecked
     link_checked_at TEXT,
-    stage           TEXT NOT NULL DEFAULT 'not_applied',      -- not_applied|applied|confirmed|oa|interview|offer|rejected
+    stage           TEXT NOT NULL DEFAULT 'not_applied',      -- not_applied|applied|oa|interview|offer|rejected ('confirmed' = legacy alias of applied)
     status          TEXT NOT NULL DEFAULT 'new',              -- new|reviewed|dismissed
     dedup_key       TEXT,                                     -- canonical fingerprint (company|title|city)
     duplicate_of    TEXT                                      -- NULL = canonical; else the id of the kept copy

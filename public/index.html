@@ -159,7 +159,7 @@
       { key: "applied", label: "Applied" },
       { key: "skills", label: "Skills" },
     ];
-    const STAGES = ["not_applied","applied","confirmed","oa","interview","offer","rejected"];
+    const STAGES = ["not_applied","applied","oa","interview","offer","rejected"];
     let active = "top_picks";
 
     async function j(url, opts) { const r = await fetch(url, opts); return r.json(); }
@@ -226,8 +226,10 @@
       return `<select data-id="${esc(job.id)}">${opts}</select>`;
     }
 
-    const STAGE_LABEL = { not_applied:"Not applied", applied:"Applied", confirmed:"Confirmed", oa:"OA", interview:"Interview", offer:"Offer", rejected:"Rejected" };
-    const EVENT_LABEL = { applied:"Applied", confirmed:"Confirmed", confirmation:"Confirmed", oa:"OA", interview:"Interview", offer:"Offer", rejected:"Rejected", rejection:"Rejected", other:"Update" };
+    // 'confirmed'/'confirmation' fold into "Applied" — an application ack and
+    // applying are one milestone (confirmed is a legacy value on old rows).
+    const STAGE_LABEL = { not_applied:"Not applied", applied:"Applied", confirmed:"Applied", oa:"OA", interview:"Interview", offer:"Offer", rejected:"Rejected" };
+    const EVENT_LABEL = { applied:"Applied", confirmed:"Applied", confirmation:"Applied", oa:"OA", interview:"Interview", offer:"Offer", rejected:"Rejected", rejection:"Rejected", other:"Update" };
     function fmtDate(s) {
       const d = new Date(String(s).replace(" ", "T"));
       return isNaN(d) ? esc(s) : d.toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" });

@@ -38,8 +38,10 @@ const COMMANDS: {
     desc: "Load four sample postings to try the tracker without any credentials." },
 ];
 
+// 'confirmed' was merged into 'applied' (a company acknowledging your
+// application is the same milestone as you applying).
 const STAGES = [
-  "not_applied", "applied", "confirmed", "oa", "interview", "offer", "rejected",
+  "not_applied", "applied", "oa", "interview", "offer", "rejected",
 ];
 
 const JOB_COLS = `id, title, company, location, remote, url, category,

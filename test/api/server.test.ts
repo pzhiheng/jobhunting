@@ -344,7 +344,7 @@ describe("POST /api/jobs/:id/stage", () => {
   });
 
   test("accepts all valid stage values", async () => {
-    const stages = ["not_applied", "applied", "confirmed", "oa", "interview", "offer", "rejected"];
+    const stages = ["not_applied", "applied", "oa", "interview", "offer", "rejected"];
     for (const stage of stages) {
       const { status } = await api("/api/jobs/seed:1/stage", {
         method: "POST",
