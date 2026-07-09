@@ -1,11 +1,14 @@
 import { readFileSync } from "node:fs";
 import type { JobSource, NormalizedJob, SearchConfig } from "./types.js";
+import { locationIsUS } from "./simplify.js";
 
 /**
- * Company career boards (Greenhouse / Lever / Ashby) — keyless public APIs that
- * return the employer's **direct apply URL** (unlike Adzuna, which only hands back
- * a bot-blocked redirect). Each board is per-company, so the target companies are
- * configured in `companies.json` (board token = the slug in the board's URL).
+ * Company career boards (Greenhouse / Lever / Ashby / SmartRecruiters / Workday)
+ * — keyless public APIs that return the employer's **direct apply URL** (unlike
+ * Adzuna, which only hands back a bot-blocked redirect). Each board is
+ * per-company, so the target companies are configured in `companies.json`
+ * (board token = the slug in the board's URL). Workday matters most for
+ * freshness: it's where large companies' LinkedIn postings actually live.
  *
  * These boards list *all* of a company's roles, so we keep only postings whose
  * title matches the filter's intent (intern gate + role keywords derived from the
@@ -14,10 +17,18 @@ import type { JobSource, NormalizedJob, SearchConfig } from "./types.js";
 const COMPANIES_PATH = new URL("../../companies.json", import.meta.url).pathname;
 const PER_COMPANY_CAP = 40; // safety bound so one company can't flood a run
 
+interface WorkdayBoard {
+  tenant: string; // e.g. "nvidia"
+  host: string; // e.g. "wd5"
+  site: string; // e.g. "NVIDIAExternalCareerSite"
+}
+
 interface Companies {
   greenhouse?: string[];
   lever?: string[];
   ashby?: string[];
+  smartrecruiters?: string[];
+  workday?: WorkdayBoard[];
 }
 
 // "intern" / "interns" / "internship(s)" as a whole word — NOT "internal".
@@ -60,6 +71,17 @@ function stripHtml(s: string): string {
 
 async function getJson(url: string): Promise<any> {
   const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function postJson(url: string, body: unknown): Promise<any> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -140,6 +162,83 @@ async function ashby(company: string, keep: (t: string) => boolean): Promise<Nor
   });
 }
 
+async function smartrecruiters(company: string, keep: (t: string) => boolean): Promise<NormalizedJob[]> {
+  const data = await getJson(
+    `https://api.smartrecruiters.com/v1/companies/${company}/postings?limit=100`,
+  );
+  const rows = (data.content ?? []).filter(
+    (j: any) => String(j.location?.country ?? "").toLowerCase() === "us" || j.location?.remote,
+  );
+  return take<any>(rows, keep, (j) => j.name ?? "").map((j) => {
+    const location = [j.location?.city, j.location?.region].filter(Boolean).join(", ");
+    return {
+      id: `smartrecruiters:${company}:${j.id}`,
+      source: "smartrecruiters",
+      externalId: `${company}:${j.id}`,
+      title: j.name,
+      company: j.company?.name || company,
+      location,
+      remote: !!j.location?.remote,
+      url: `https://jobs.smartrecruiters.com/${company}/${j.id}`,
+      description: "",
+      salaryMin: null,
+      salaryMax: null,
+      category: "internship",
+      postedAt: j.releasedDate ?? null,
+    };
+  });
+}
+
+/** Workday's relative "postedOn" text → ISO date (null when unknown/30+ days). */
+export function parseWorkdayPostedOn(s: string): string | null {
+  const t = s.toLowerCase();
+  const day = 24 * 60 * 60 * 1000;
+  if (t.includes("today")) return new Date().toISOString();
+  if (t.includes("yesterday")) return new Date(Date.now() - day).toISOString();
+  const m = t.match(/(\d+)(\+?)\s+days?\s+ago/);
+  if (m && !m[2]) return new Date(Date.now() - Number(m[1]) * day).toISOString();
+  return null; // "30+ days ago" or unrecognized
+}
+
+async function workday(b: WorkdayBoard, keep: (t: string) => boolean): Promise<NormalizedJob[]> {
+  const base = `https://${b.tenant}.${b.host}.myworkdayjobs.com`;
+  // The cxs search endpoint pages 20 at a time; "intern" also matches
+  // "internal", which the title keep-filter prunes below.
+  const rows: any[] = [];
+  for (let offset = 0; offset < PER_COMPANY_CAP * 2; offset += 20) {
+    const data = await postJson(`${base}/wday/cxs/${b.tenant}/${b.site}/jobs`, {
+      appliedFacets: {},
+      limit: 20,
+      offset,
+      searchText: "intern",
+    });
+    const page = data.jobPostings ?? [];
+    rows.push(...page);
+    if (page.length < 20) break;
+  }
+  return take<any>(rows, keep, (j) => j.title ?? "")
+    .filter((j) => {
+      const loc = String(j.locationsText ?? "");
+      // "2 Locations" gives no geography — keep it and let curate judge.
+      return locationIsUS(loc) || /\d+\s+locations/i.test(loc);
+    })
+    .map((j) => ({
+      id: `workday:${b.tenant}:${j.externalPath}`,
+      source: "workday",
+      externalId: `${b.tenant}:${j.externalPath}`,
+      title: j.title,
+      company: b.tenant,
+      location: String(j.locationsText ?? ""),
+      remote: /remote/i.test(`${j.locationsText ?? ""} ${j.title ?? ""}`),
+      url: `${base}/en-US/${b.site}${j.externalPath}`,
+      description: "",
+      salaryMin: null,
+      salaryMax: null,
+      category: "internship",
+      postedAt: parseWorkdayPostedOn(String(j.postedOn ?? "")),
+    }));
+}
+
 export const companyBoards: JobSource = {
   name: "company-boards",
 
@@ -162,6 +261,10 @@ export const companyBoards: JobSource = {
       ...(companies.greenhouse ?? []).map((c) => run(`greenhouse/${c}`, () => greenhouse(c, keep))),
       ...(companies.lever ?? []).map((c) => run(`lever/${c}`, () => lever(c, keep))),
       ...(companies.ashby ?? []).map((c) => run(`ashby/${c}`, () => ashby(c, keep))),
+      ...(companies.smartrecruiters ?? []).map((c) =>
+        run(`smartrecruiters/${c}`, () => smartrecruiters(c, keep)),
+      ),
+      ...(companies.workday ?? []).map((b) => run(`workday/${b.tenant}`, () => workday(b, keep))),
     ]);
 
     return jobs;

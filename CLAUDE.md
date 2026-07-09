@@ -81,9 +81,10 @@ the DB is libSQL/Turso (a shared client), not an in-process file by default.
   **cross-source** dedup is a separate pass (`dedup.ts`), see below.
 - **`sources/`** — pluggable `JobSource` interface consuming a `SearchConfig`.
   Three sources: `adzuna.ts` (keyword search across boards; returns an Adzuna
-  redirect URL), `companyBoards.ts` (keyless Greenhouse/Lever/Ashby boards for
-  the companies in `companies.json` → **direct employer apply URLs**; keeps only
-  titles matching the filter's intent via `makeKeepFilter`), and `simplify.ts`
+  redirect URL), `companyBoards.ts` (keyless Greenhouse/Lever/Ashby/
+  SmartRecruiters/Workday boards for the companies in `companies.json` →
+  **direct employer apply URLs**; keeps only titles matching the filter's
+  intent via `makeKeepFilter`), and `simplify.ts`
   (keyless community internship JSON feeds — SimplifyJobs/Pitt-CSC plus the
   vanshb03 Summer-2027 list, whose yearless `season` is cycle-qualified →
   direct apply links; filtered to active, in-window US SWE/ML roles).

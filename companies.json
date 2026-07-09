@@ -1,5 +1,5 @@
 {
-  "_comment": "Company career boards (keyless public APIs) → direct apply links. Edit freely: add the board token (the slug in the board URL) under its ATS. Greenhouse: boards-api.greenhouse.io/v1/boards/<token>. Lever: api.lever.co/v0/postings/<token>. Ashby: jobs.ashbyhq.com/<token>.",
+  "_comment": "Company career boards (keyless public APIs) → direct apply links. Edit freely: add the board token (the slug in the board URL) under its ATS. Greenhouse: boards-api.greenhouse.io/v1/boards/<token>. Lever: api.lever.co/v0/postings/<token>. Ashby: jobs.ashbyhq.com/<token>. SmartRecruiters: api.smartrecruiters.com/v1/companies/<token>/postings. Workday: <tenant>.<host>.myworkdayjobs.com/<site> (all three parts from the careers URL). All entries verified live before adding.",
   "greenhouse": [
     "stripe",
     "databricks",
@@ -14,15 +14,52 @@
     "brex",
     "asana",
     "datadog",
-    "sofi"
+    "sofi",
+    "anthropic",
+    "spacex",
+    "andurilindustries",
+    "scaleai",
+    "waymo",
+    "duolingo",
+    "doordashusa",
+    "reddit",
+    "dropbox",
+    "gusto",
+    "samsara",
+    "verkada",
+    "figma",
+    "discord"
   ],
   "lever": [
-    "palantir"
+    "palantir",
+    "plaid",
+    "zoox",
+    "voleon"
   ],
   "ashby": [
     "ramp",
     "notion",
     "vanta",
-    "openai"
+    "openai",
+    "linear",
+    "replit",
+    "cursor",
+    "sierra"
+  ],
+  "smartrecruiters": [
+    "Visa",
+    "ServiceNow",
+    "WesternDigital",
+    "Squarepoint"
+  ],
+  "workday": [
+    { "tenant": "nvidia", "host": "wd5", "site": "NVIDIAExternalCareerSite" },
+    { "tenant": "salesforce", "host": "wd12", "site": "External_Career_Site" },
+    { "tenant": "adobe", "host": "wd5", "site": "external_university" },
+    { "tenant": "intel", "host": "wd1", "site": "External" },
+    { "tenant": "paypal", "host": "wd1", "site": "jobs" },
+    { "tenant": "capitalone", "host": "wd12", "site": "Capital_One" },
+    { "tenant": "workday", "host": "wd5", "site": "Workday" },
+    { "tenant": "micron", "host": "wd1", "site": "External" }
   ]
 }
