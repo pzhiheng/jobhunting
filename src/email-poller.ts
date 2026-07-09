@@ -222,9 +222,11 @@ const CLASSIFY_SYSTEM = `Classify a recruiting email about a job application int
 challenge invite), "interview" (interview invitation/scheduling), "offer" (a job offer),
 "rejection" (declined / not moving forward), or "other". Subjects like "Thank you for
 your interest" or "Update on your application" can be either a confirmation or a
-rejection — decide from the body text, not the subject. Also extract the hiring
-company's name, and the specific job title/role the email is about (empty string if
-none is mentioned).`;
+rejection — decide from the body text, not the subject. Classify "interview" ONLY for
+scheduling/invitations to speak with a human; prep or logistics emails around an online
+assessment ("prepare for your interview/assessment", login codes, practice material)
+are "oa". Also extract the hiring company's name, and the specific job title/role the
+email is about (empty string if none is mentioned).`;
 
 async function classify(email: RawEmail, client: Anthropic | null): Promise<Classification> {
   if (isMock() || !client) return mockClassify(email);
