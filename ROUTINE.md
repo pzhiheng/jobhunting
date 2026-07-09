@@ -49,6 +49,14 @@ run, so it un-hides itself if the posting comes back.
 > 6. `npm run analyze`
 > 7. `npm run send-digest` — emails the digest (clickable apply links + skills)
 >    to `DIGEST_TO` via SMTP. Report the recipient + messageId it prints.
+> 8. **Source watch** (free, report only — change nothing): probe whether the
+>    awaited 2027 community feeds exist yet (HTTP 200 on the raw
+>    `listings.json` of `SimplifyJobs/Summer2027-Internships` or
+>    `cvrve/Summer2027-Internships`); note any source/board from the `fetch`
+>    output that has errored or yielded 0 for days; if a new feed came online,
+>    a source looks dead, or a clearly better keyless source exists for the
+>    hunt, add a "Source watch:" line to the completion report. Otherwise stay
+>    silent.
 >
 > If any step other than `poll` fails, stop and report which one and its error.
 
