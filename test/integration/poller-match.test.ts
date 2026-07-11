@@ -1,7 +1,25 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { openTestDb } from "../helpers/tmpdb.js";
-import { findJob, titleOverlap, mockClassify, createJobFromEmail } from "../../src/email-poller.js";
+import { findJob, titleOverlap, mockClassify, createJobFromEmail, imapAccounts } from "../../src/email-poller.js";
+
+test("imapAccounts builds primary (SMTP fallback) and optional second inbox", () => {
+  // Primary only, via SMTP creds.
+  assert.deepEqual(imapAccounts({ SMTP_USER: "a@x.com", SMTP_PASS: "p" }), [
+    { user: "a@x.com", pass: "p", host: "imap.gmail.com", port: 993 },
+  ]);
+  // Second inbox (e.g. a university mailbox for Handshake emails).
+  const two = imapAccounts({
+    SMTP_USER: "a@x.com", SMTP_PASS: "p",
+    IMAP2_USER: "b@nyu.edu", IMAP2_PASS: "q", IMAP2_HOST: "imap.uni.edu",
+  });
+  assert.equal(two.length, 2);
+  assert.deepEqual(two[1], { user: "b@nyu.edu", pass: "q", host: "imap.uni.edu", port: 993 });
+  // IMAP_* overrides SMTP_*; incomplete IMAP2 (no pass) is ignored.
+  assert.equal(imapAccounts({ IMAP_USER: "c@x.com", IMAP_PASS: "r", SMTP_USER: "a@x.com", SMTP_PASS: "p", IMAP2_USER: "b@y.com" })[0].user, "c@x.com");
+  assert.equal(imapAccounts({ IMAP_USER: "c@x.com", IMAP_PASS: "r", IMAP2_USER: "b@y.com" }).length, 1);
+  assert.deepEqual(imapAccounts({}), []);
+});
 
 test("titleOverlap counts shared significant tokens", () => {
   assert.ok(titleOverlap("Software Engineer Intern", "Software Engineering Intern") >= 2);

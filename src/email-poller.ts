@@ -56,11 +56,66 @@ const MOCK_INBOX: RawEmail[] = [
 
 // --- Email fetching: mock fixture, IMAP (app password), or Gmail OAuth REST ---
 
+interface ImapAccount {
+  user: string;
+  pass: string;
+  host: string;
+  port: number;
+}
+
+/** All configured IMAP inboxes: the primary (IMAP or SMTP creds) plus an
+ *  optional second mailbox via IMAP2_USER / IMAP2_PASS — e.g. a university
+ *  inbox where Handshake sends its application emails. Exported for tests. */
+export function imapAccounts(env: NodeJS.ProcessEnv): ImapAccount[] {
+  const accounts: ImapAccount[] = [];
+  const primaryUser = env.IMAP_USER || env.SMTP_USER;
+  const primaryPass = env.IMAP_PASS || env.SMTP_PASS;
+  if (primaryUser && primaryPass) {
+    accounts.push({
+      user: primaryUser,
+      pass: primaryPass,
+      host: env.IMAP_HOST || "imap.gmail.com",
+      port: Number(env.IMAP_PORT || 993),
+    });
+  }
+  if (env.IMAP2_USER && env.IMAP2_PASS) {
+    accounts.push({
+      user: env.IMAP2_USER,
+      pass: env.IMAP2_PASS,
+      host: env.IMAP2_HOST || "imap.gmail.com",
+      port: Number(env.IMAP2_PORT || 993),
+    });
+  }
+  return accounts;
+}
+
 async function fetchEmails(alreadySeen: Set<string>): Promise<RawEmail[]> {
   if (isMock()) return MOCK_INBOX;
   // Prefer IMAP with an app password (simplest — reuses the SMTP creds); fall
   // back to the Gmail OAuth REST path if only GOOGLE_* is configured.
-  if (process.env.IMAP_USER || process.env.SMTP_USER) return fetchViaImap(alreadySeen);
+  const accounts = imapAccounts(process.env);
+  if (accounts.length) {
+    // Merge all inboxes, deduped by message-id (an email forwarded between the
+    // accounts keeps its id, so it's read once). One broken inbox doesn't lose
+    // the others; if every inbox fails, that's a real error.
+    const emails: RawEmail[] = [];
+    const ids = new Set<string>();
+    let failures = 0;
+    for (const acct of accounts) {
+      try {
+        for (const e of await fetchViaImap(acct, alreadySeen)) {
+          if (ids.has(e.id)) continue;
+          ids.add(e.id);
+          emails.push(e);
+        }
+      } catch (e) {
+        failures++;
+        console.error(`  [poll] inbox ${acct.user}: ${(e as Error).message}`);
+      }
+    }
+    if (failures === accounts.length) throw new Error("Every configured inbox failed to read.");
+    return emails;
+  }
   if (process.env.GOOGLE_CLIENT_ID) return fetchViaGmailOAuth();
   throw new Error(
     "No inbox configured. Set IMAP_USER/IMAP_PASS (or SMTP_USER/SMTP_PASS for IMAP via " +
@@ -73,27 +128,22 @@ function toSnippet(text: string): string {
   return text.replace(/\s+/g, " ").trim().slice(0, 700);
 }
 
-/** Read recent inbox messages over IMAP using an app password (no OAuth).
+/** Read one inbox's recent messages over IMAP using an app password (no OAuth).
  *  Bodies are downloaded only for messages not already recorded — the body is
  *  what separates a rejection from a confirmation when the subject is bland
  *  ("Thank you for your interest in …"). */
-async function fetchViaImap(alreadySeen: Set<string>): Promise<RawEmail[]> {
-  const user = process.env.IMAP_USER || process.env.SMTP_USER;
-  const pass = process.env.IMAP_PASS || process.env.SMTP_PASS;
-  if (!user || !pass) {
-    throw new Error("Missing IMAP_USER/IMAP_PASS (or SMTP_USER/SMTP_PASS) in .env for the IMAP reader.");
-  }
+async function fetchViaImap(acct: ImapAccount, alreadySeen: Set<string>): Promise<RawEmail[]> {
   const client = new ImapFlow({
-    host: process.env.IMAP_HOST || "imap.gmail.com",
-    port: Number(process.env.IMAP_PORT || 993),
+    host: acct.host,
+    port: acct.port,
     secure: true,
-    auth: { user, pass },
+    auth: { user: acct.user, pass: acct.pass },
     logger: false,
   });
 
   const days = Number(process.env.POLL_DAYS || 30);
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  const me = user.toLowerCase();
+  const me = acct.user.toLowerCase();
   const emails: RawEmail[] = [];
   const seen = new Set<string>();
 
@@ -225,8 +275,12 @@ your interest" or "Update on your application" can be either a confirmation or a
 rejection — decide from the body text, not the subject. Classify "interview" ONLY for
 scheduling/invitations to speak with a human; prep or logistics emails around an online
 assessment ("prepare for your interview/assessment", login codes, practice material)
-are "oa". Also extract the hiring company's name, and the specific job title/role the
-email is about (empty string if none is mentioned).`;
+are "oa". Application emails often arrive via a platform (Handshake, LinkedIn,
+Greenhouse, Workday, Lever) — e.g. Handshake's "Your application to <role> at
+<company> was submitted". Extract the ACTUAL hiring company and role from the
+content; never use the platform's name as the company. Also extract the hiring
+company's name, and the specific job title/role the email is about (empty string if
+none is mentioned).`;
 
 async function classify(email: RawEmail, client: Anthropic | null): Promise<Classification> {
   if (isMock() || !client) return mockClassify(email);
