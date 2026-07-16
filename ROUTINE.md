@@ -31,7 +31,10 @@ fetch → check-links → curate → blurbs → analyze → digest → email
 Every step only populates/updates the shared DB — nothing is ever deleted. A
 posting that 404s is flagged (`link_status='broken'`), which hides it from the
 tracker's listings; the row itself is kept, and `check-links` re-checks it every
-run, so it un-hides itself if the posting comes back.
+run, so it un-hides itself if the posting comes back. Not-applied postings also
+**age out 15 days after posting** — they drop from every listing, digest, and
+link-check automatically (rows kept; applying — even via a late email — brings
+one back into the Applied pipeline).
 
 ## Routine prompt (paste into `/schedule`, daily)
 

@@ -5,10 +5,12 @@ import type { Client } from "@libsql/client";
 
 // Only the canonical copy of a deduped posting is listed/counted.
 const CANONICAL = "duplicate_of IS NULL";
+// Not-applied postings age out 15 days after posting (see server.ts FRESH).
+const FRESH = "(stage <> 'not_applied' OR posted_at IS NULL OR posted_at >= date('now', '-15 day'))";
 // Mirrors the web app's "Top picks" section (server.ts SECTIONS.top_picks):
-// suitable, strong relevance, link not dead, canonical.
+// suitable, strong relevance, link not dead, canonical, not aged out.
 const TOP_PICKS_WHERE =
-  `suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied' AND ${CANONICAL}`;
+  `suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied' AND ${CANONICAL} AND ${FRESH}`;
 
 function fmtSalary(min: unknown, max: unknown): string {
   const k = (n: number) => `$${Math.round(n / 1000)}k`;

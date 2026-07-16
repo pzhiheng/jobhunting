@@ -40,11 +40,15 @@ async function main() {
   // Check links that have never been checked, AND re-check every not-yet-applied
   // job each run — so a posting that dies *after* its first check still gets
   // caught (its link flips to 'broken' and it drops out of the listings).
-  // Applied jobs keep their first result (you've already engaged with them).
+  // Applied jobs keep their first result (you've already engaged with them), and
+  // aged-out postings (not applied within 15 days of posting — hidden from all
+  // listings) aren't worth the requests.
   const { rows } = await db.execute(
     `SELECT id, url FROM jobs
      WHERE url IS NOT NULL AND url <> ''
-       AND (link_status = 'unchecked' OR stage = 'not_applied')`,
+       AND (link_status = 'unchecked'
+            OR (stage = 'not_applied'
+                AND (posted_at IS NULL OR posted_at >= date('now', '-15 day'))))`,
   );
 
   let ok = 0;

@@ -15,9 +15,13 @@ import type { Client } from "@libsql/client";
 // Where the tracker is reachable (override if you host it; default = local serve).
 const TRACKER_URL = process.env.TRACKER_URL || "http://localhost:3001";
 
-// Mirrors the app's "Top picks" definition (server.ts / digest.ts).
+// Mirrors the app's "Top picks" definition (server.ts / digest.ts): suitable,
+// strong relevance, live link, not applied, canonical (no duplicate copies),
+// and not aged out (not-applied postings drop 15 days after posting).
 const TOP_PICKS_WHERE =
-  "suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied'";
+  "suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') " +
+  "AND stage = 'not_applied' AND duplicate_of IS NULL " +
+  "AND (posted_at IS NULL OR posted_at >= date('now', '-15 day'))";
 
 const esc = (s: unknown) =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

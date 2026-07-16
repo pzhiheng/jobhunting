@@ -54,18 +54,24 @@ const JOB_COLS = `id, title, company, location, remote, url, category,
 const AVAILABLE = "(stage <> 'not_applied' OR link_status NOT IN ('broken','expired'))";
 // Only the canonical copy of a deduped posting is ever listed/counted.
 const CANONICAL = "duplicate_of IS NULL";
+// Not-applied postings age out of every listing 15 days after posting — if you
+// haven't applied by then you won't, so they stop occupying the board. Rows are
+// kept (never deleted): a hard delete would just get re-fetched from the feeds
+// and re-scored. Applied jobs never age out; undated postings don't either.
+const STALE_DAYS = 15;
+const FRESH = `(stage <> 'not_applied' OR posted_at IS NULL OR posted_at >= date('now', '-${STALE_DAYS} day'))`;
 
 // Section → WHERE/ORDER. Lists are sorted newest-posted-first (not by company);
 // Top picks leads with relevance, then recency. Gone postings drop out via
 // AVAILABLE; duplicate copies drop out via CANONICAL. "top_picks" = suitable,
 // strong relevance, link not dead, and NOT yet applied.
 const SECTIONS: Record<string, { where: string; order: string }> = {
-  all: { where: `${CANONICAL} AND ${AVAILABLE}`, order: "posted_at DESC" },
+  all: { where: `${CANONICAL} AND ${AVAILABLE} AND ${FRESH}`, order: "posted_at DESC" },
   top_picks: {
-    where: `suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied' AND ${CANONICAL}`,
+    where: `suitability = 'suitable' AND relevance >= 4 AND link_status NOT IN ('broken','expired') AND stage = 'not_applied' AND ${CANONICAL} AND ${FRESH}`,
     order: "relevance DESC, posted_at DESC",
   },
-  not_suitable: { where: `suitability = 'unsuitable' AND ${AVAILABLE} AND ${CANONICAL}`, order: "posted_at DESC" },
+  not_suitable: { where: `suitability = 'unsuitable' AND ${AVAILABLE} AND ${CANONICAL} AND ${FRESH}`, order: "posted_at DESC" },
   applied: { where: `stage <> 'not_applied' AND ${CANONICAL}`, order: "stage, posted_at DESC" },
 };
 

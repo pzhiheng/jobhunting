@@ -41,6 +41,8 @@ export const FIXTURE_COUNTS: FixtureCounts = {
 
 export async function seedFixture(db: Client): Promise<void> {
   const now = new Date().toISOString();
+  // Relative posted dates (newest = seed:1) so the fixture never hits the 15-day age-out.
+  const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const jobs = [
     {
@@ -50,7 +52,7 @@ export async function seedFixture(db: Client): Promise<void> {
       url: "https://example.com/1",
       description: "Build distributed systems in Go and Kubernetes.",
       salary_min: 160000, salary_max: 210000, category: "swe",
-      posted_at: "2026-06-22", fetched_at: now,
+      posted_at: daysAgo(1), fetched_at: now,
       relevance: 5, relevance_notes: "great fit",
       suitability: "suitable", suitability_notes: "matches resume",
       link_status: "ok", link_checked_at: now,
@@ -63,7 +65,7 @@ export async function seedFixture(db: Client): Promise<void> {
       url: "https://example.com/2",
       description: "React and TypeScript, entry level.",
       salary_min: 80000, salary_max: 100000, category: "swe",
-      posted_at: "2026-06-22", fetched_at: now,
+      posted_at: daysAgo(2), fetched_at: now,
       relevance: 2, relevance_notes: "too junior",
       suitability: "unsuitable", suitability_notes: "underpowered",
       link_status: "ok", link_checked_at: now,
@@ -76,7 +78,7 @@ export async function seedFixture(db: Client): Promise<void> {
       url: "https://broken.invalid/3",
       description: "Python and TypeScript.",
       salary_min: 140000, salary_max: 190000, category: "swe",
-      posted_at: "2026-06-22", fetched_at: now,
+      posted_at: daysAgo(3), fetched_at: now,
       relevance: 3, relevance_notes: "ok fit",
       suitability: "suitable", suitability_notes: "matches",
       link_status: "broken", link_checked_at: now,
@@ -89,7 +91,7 @@ export async function seedFixture(db: Client): Promise<void> {
       url: "https://example.com/4",
       description: "Python and distributed ML systems.",
       salary_min: 170000, salary_max: 230000, category: "mle",
-      posted_at: "2026-06-22", fetched_at: now,
+      posted_at: daysAgo(4), fetched_at: now,
       relevance: 5, relevance_notes: "bullseye",
       suitability: "suitable", suitability_notes: "great match",
       link_status: "ok", link_checked_at: now,

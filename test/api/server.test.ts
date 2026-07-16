@@ -222,6 +222,48 @@ describe("GET /api/applied", () => {
   });
 });
 
+// --- 15-day age-out of not-applied postings ---
+describe("15-day age-out", () => {
+  test("stale not-applied jobs drop from listings; applying brings them back", async () => {
+    const db2 = await openTestDb();
+    const daysAgo = (n: number) =>
+      new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const insert = (id: string, posted: string) =>
+      db2.execute({
+        sql: `INSERT INTO jobs (id, source, external_id, title, company, url, posted_at, fetched_at,
+                relevance, suitability, link_status, stage, status)
+              VALUES (:id, 'seed', :id, 'SWE Intern', 'AgeCo', 'https://x.example', :posted,
+                datetime('now'), 5, 'suitable', 'ok', 'not_applied', 'reviewed')`,
+        args: { id, posted },
+      });
+    await insert("fresh", daysAgo(3));
+    await insert("stale", daysAgo(20));
+
+    const server2 = createServer(createApp(db2));
+    await new Promise<void>((res) => server2.listen(0, "127.0.0.1", res));
+    const { port } = server2.address() as { port: number };
+    const get = async (path: string) =>
+      (await (await fetch(`http://127.0.0.1:${port}${path}`)).json()) as { id: string }[];
+    try {
+      for (const section of ["all", "top_picks"]) {
+        const ids = (await get(`/api/jobs?section=${section}`)).map((j) => j.id);
+        assert.ok(ids.includes("fresh"), `${section} should list the fresh job`);
+        assert.ok(!ids.includes("stale"), `${section} should hide the 20-day-old job`);
+      }
+      // Applying (e.g. a late confirmation email) overrides the age-out.
+      await fetch(`http://127.0.0.1:${port}/api/jobs/stale/stage`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ stage: "applied" }),
+      });
+      const applied = (await get("/api/jobs?section=applied")).map((j) => j.id);
+      assert.ok(applied.includes("stale"), "applied jobs never age out");
+    } finally {
+      server2.close();
+      db2.close();
+    }
+  });
+});
+
 // --- POST /api/jobs (manual application) ---
 describe("POST /api/jobs", () => {
   test("logs a manually-applied job and it appears in /api/applied", async () => {
