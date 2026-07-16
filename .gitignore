@@ -19,3 +19,4 @@ playwright-report/
 # Office temp & lock files
 ~$*
 .~*
+source-watch.md
