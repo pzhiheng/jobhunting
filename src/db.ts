@@ -35,13 +35,30 @@ export async function openDb(overrideUrl?: string): Promise<Client> {
 
 const slugify = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-/** Canonical fingerprint for cross-source dedup: same company + same title is
- *  treated as the same posting, regardless of which source reported it or what
- *  (often noisy) location string it carried. Location is deliberately excluded —
- *  aggregators like Adzuna emit junk locations for one role, which would defeat a
- *  city-based key. The `location` arg is accepted (callers pass it) but ignored. */
+// Corporate dressing that differs between an email's company name and a job
+// board's ("D. E. Shaw Group" vs "DE Shaw", "IMC Trading" vs "IMC", "Tesla, Inc."
+// vs "Tesla") — stripped so the same employer normalizes to the same identity.
+const COMPANY_SUFFIXES = new Set([
+  "inc", "llc", "ltd", "co", "corp", "corporation", "company", "group",
+  "industries", "technologies", "technology", "labs", "trading", "plc", "holdings",
+]);
+
+/** Squashed company identity: lowercase alphanumerics with punctuation and
+ *  corporate suffix words removed — "D. E. Shaw Group" and "DE Shaw" → "deshaw". */
+export function normCompany(s: unknown): string {
+  const tokens = String(s ?? "").toLowerCase().match(/[a-z0-9]+/g) ?? [];
+  const kept = tokens.filter((t) => !COMPANY_SUFFIXES.has(t));
+  return (kept.length ? kept : tokens).join("");
+}
+
+/** Canonical fingerprint for cross-source dedup: same (normalized) company +
+ *  same title is treated as the same posting, regardless of which source
+ *  reported it or what (often noisy) location string it carried. Location is
+ *  deliberately excluded — aggregators like Adzuna emit junk locations for one
+ *  role, which would defeat a city-based key. The `location` arg is accepted
+ *  (callers pass it) but ignored. */
 export function dedupKey(company: unknown, title: unknown, _location?: unknown): string {
-  return `${slugify(company)}|${slugify(title)}`;
+  return `${normCompany(company)}|${slugify(title)}`;
 }
 
 /** Full schema. Columns for later phases (relevance, suitability, link, stage) are

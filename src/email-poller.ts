@@ -5,7 +5,7 @@ import { simpleParser } from "mailparser";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { openDb } from "./db.js";
+import { openDb, normCompany } from "./db.js";
 import type { Client } from "@libsql/client";
 
 const isMock = () => !!process.env.JOBHUNTER_MOCK;
@@ -332,15 +332,22 @@ export function titleOverlap(a: string, b: string): number {
   return n;
 }
 
-/** Match an email to a specific job: narrow to the company, then (if multiple
- *  roles there) pick the one whose title best matches the email's role. */
+/** Match an email to a specific job: narrow to the company (on normalized
+ *  identity, so "D. E. Shaw Group" matches "DE Shaw"), then (if multiple roles
+ *  there) pick the one whose title best matches the email's role. */
 export async function findJob(db: Client, company: string, title: string): Promise<string | null> {
-  if (!company) return null;
+  const c = normCompany(company);
+  if (!c) return null;
   const { rows } = await db.execute("SELECT id, company, title FROM jobs ORDER BY id");
-  const c = company.toLowerCase();
   const candidates = rows.filter((r) => {
-    const jc = String(r.company ?? "").toLowerCase();
-    return jc && (jc.includes(c) || c.includes(jc));
+    const jc = normCompany(r.company);
+    if (!jc) return false;
+    if (jc === c) return true;
+    // Substring containment only when the shorter side is long enough to be
+    // meaningful (avoids two-letter names matching everything).
+    if (c.length >= 3 && jc.includes(c)) return true;
+    if (jc.length >= 3 && c.includes(jc)) return true;
+    return false;
   });
   if (candidates.length === 0) return null;
   if (candidates.length === 1 || !title) return String(candidates[0].id);

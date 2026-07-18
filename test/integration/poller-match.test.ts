@@ -66,6 +66,27 @@ test("findJob picks the specific role at a company by title", async () => {
   }
 });
 
+test("findJob matches through punctuation and corporate suffixes", async () => {
+  const db = await openTestDb();
+  try {
+    const insert = (id: string, company: string, title: string) =>
+      db.execute({
+        sql: "INSERT INTO jobs (id, source, external_id, title, company, fetched_at) VALUES (:id,'seed',:id,:title,:company,datetime('now'))",
+        args: { id, title, company },
+      });
+    await insert("j:1", "DE Shaw", "Software Developer Intern");
+    await insert("j:2", "IMC Trading", "Software Engineer Intern");
+    await insert("j:3", "Tesla, Inc.", "SWE Intern");
+
+    // The email's company dressing differs from the board's — still the same employer.
+    assert.equal(await findJob(db, "D. E. Shaw Group", "Software Developer Intern"), "j:1");
+    assert.equal(await findJob(db, "IMC", "Software Engineering Internship"), "j:2");
+    assert.equal(await findJob(db, "Tesla", "SWE Internship"), "j:3");
+  } finally {
+    db.close();
+  }
+});
+
 test("createJobFromEmail tracks an unmatched application and is reused by later emails", async () => {
   const db = await openTestDb();
   try {
